@@ -10,5 +10,12 @@ public class Project_X : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
+
+        PrivateIncludePaths.AddRange(
+            new string[]
+            {
+                "Project_X",
+                "Project_X/Entity"
+        });
     }
 }

@@ -15,7 +15,9 @@ public class Project_X : ModuleRules
             new string[]
             {
                 "Project_X",
-                "Project_X/Entity"
+                "Project_X/Entity",
+                "Project_X/Interface",
+                "Project_X/Component"
         });
     }
 }

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Entity/PX_Actor.h"
+#include "PX_Actor.h"
 
 
 // Sets default values

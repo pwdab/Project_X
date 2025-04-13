@@ -3,6 +3,8 @@
 #pragma once
 
 #include "Project_X.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Character.h"
 #include "PX_Character.generated.h"
 
@@ -10,6 +12,15 @@ UCLASS()
 class PROJECT_X_API APX_Character : public ACharacter
 {
 	GENERATED_BODY()
+
+private:
+	/** Camera boom positioning the camera behind the character */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class USpringArmComponent> CameraBoom;
+
+	/** Follow camera */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UCameraComponent> FollowCamera;
 
 public:
 	// Sets default values for this character's properties

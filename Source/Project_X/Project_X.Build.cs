@@ -14,10 +14,10 @@ public class Project_X : ModuleRules
         PrivateIncludePaths.AddRange(
             new string[]
             {
-                "Project_X",
-                "Project_X/Entity",
-                "Project_X/Interface",
-                "Project_X/Component"
+                "Project_X"
+                //"Project_X/Entity",
+                //"Project_X/Interface",
+                //"Project_X/Component"
         });
     }
 }

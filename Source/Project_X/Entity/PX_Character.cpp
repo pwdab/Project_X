@@ -13,14 +13,16 @@ APX_Character::APX_Character()
 	// Setup SpringArm Component
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 300.0f;
+	CameraBoom->TargetArmLength = 250.0f;
 
 	// Setup Camera Component
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom);
+	FollowCamera->SetRelativeLocation(FVector(0.0f, 75.0f, 75.0f));
+	FollowCamera->SetRelativeRotation(FRotator(-5.0f, 0.0f, 0.0f));
 
 	// Setup Skeletal Mesh
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset(TEXT("/Game/Model/Character/male/m_inner_basic.m_inner_basic"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset(TEXT("/Game/Characters/Mannequin_UE4/Meshes/SK_Mannequin.SK_Mannequin"));
 	if (SkeletalMeshAsset.Succeeded())
 	{
 		GetMesh()->SetSkeletalMesh(SkeletalMeshAsset.Object);

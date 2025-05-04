@@ -31,14 +31,14 @@ APX_Character::APX_Character()
 	GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 
 	// Setup Input Mapping Context
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMC_Default(TEXT("/Game/Character/Input/PX_IMC_Default.PX_IMC_Default"));
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMC_Default(TEXT("/Game/Project_X/Input/PX_IMC_Default.PX_IMC_Default"));
 	if (IMC_Default.Succeeded())
 	{
 		DefaultMappingContext = IMC_Default.Object;
 	}
 
 	// Setup Input Action
-	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Move(TEXT("/Game/Character/Input/Action/PX_IA_Move.PX_IA_Move"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Move(TEXT("/Game/Project_X/Input/Action/PX_IA_Move.PX_IA_Move"));
 	if (IA_Move.Succeeded())
 	{
 		MoveAction = IA_Move.Object;

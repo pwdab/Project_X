@@ -43,6 +43,14 @@ APX_Character::APX_Character()
 	{
 		MoveAction = IA_Move.Object;
 	}
+
+	// Setup AnimInstance Class
+	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimClass(TEXT("/Game/Characters/Mannequin_UE4/Animations/BP_PXCharacter.BP_PXCharacter_C"));
+	if (AnimClass.Class)
+	{
+		AnimInstance = AnimClass.Class;
+		GetMesh()->SetAnimInstanceClass(AnimInstance);
+	}
 }
 
 // Called when the game starts or when spawned
@@ -83,6 +91,8 @@ void APX_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 void APX_Character::Move(const FInputActionValue& Value)
 {
+	//UE_LOG(LogTemp, Log, TEXT("Move"));
+	//UE_LOG(LogTemp, Warning, TEXT("GameInstance : %s, Owner : %s"), *GetGameInstance()->GetName(), *GetOwner()->GetName());
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 

@@ -5,6 +5,7 @@
 #include "Project_X.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "InputMappingContext.h"
 #include "InputAction.h"
 #include "EnhancedInputComponent.h"
@@ -33,6 +34,10 @@ private:
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* MoveAction;
+
+	/** AnimInstance Class */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UAnimInstance> AnimInstance;
 
 public:
 	// Sets default values for this character's properties

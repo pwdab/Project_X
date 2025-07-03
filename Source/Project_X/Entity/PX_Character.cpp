@@ -67,6 +67,7 @@ void APX_Character::Tick(float DeltaTime)
 
 }
 
+/** Moved to PX_CharacterClient
 // Called to bind functionality to input
 void APX_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -88,7 +89,9 @@ void APX_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APX_Character::Move);
 	}
 }
+*/
 
+/** Moved to PX_CharacterClient
 void APX_Character::Move(const FInputActionValue& Value)
 {
 	//UE_LOG(LogTemp, Log, TEXT("Move"));
@@ -113,3 +116,4 @@ void APX_Character::Move(const FInputActionValue& Value)
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
 }
+*/

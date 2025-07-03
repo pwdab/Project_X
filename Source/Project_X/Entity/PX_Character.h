@@ -49,15 +49,15 @@ protected:
 
 protected:
 	/** Called for movement input */
-	void Move(const FInputActionValue& Value);
+	//void Move(const FInputActionValue& Value);
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	//virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	
-	
+	FORCEINLINE UInputMappingContext* GetDefaultMappingContext() { return DefaultMappingContext; }
+	FORCEINLINE UInputAction* GetMoveAction() { return MoveAction; }
 };

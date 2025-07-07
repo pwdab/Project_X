@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "InputMappingContext.h"
 #include "InputAction.h"
 #include "EnhancedInputComponent.h"
@@ -35,6 +36,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* MoveAction;
 
+	/** Look Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* LookAction;
+
 	/** AnimInstance Class */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UAnimInstance> AnimInstance;
@@ -60,4 +65,5 @@ public:
 
 	FORCEINLINE UInputMappingContext* GetDefaultMappingContext() { return DefaultMappingContext; }
 	FORCEINLINE UInputAction* GetMoveAction() { return MoveAction; }
+	FORCEINLINE UInputAction* GetLookAction() { return LookAction; }
 };

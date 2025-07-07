@@ -22,13 +22,15 @@ void APX_CharacterClient::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	{
 		// Moving
 		EnhancedInputComponent->BindAction(GetMoveAction(), ETriggerEvent::Triggered, this, &APX_CharacterClient::Move);
+		// Looking
+		EnhancedInputComponent->BindAction(GetLookAction(), ETriggerEvent::Triggered, this, &APX_CharacterClient::Look);
 	}
 }
 
 void APX_CharacterClient::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector2D MovementVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
 	{
@@ -45,6 +47,17 @@ void APX_CharacterClient::Move(const FInputActionValue& Value)
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
+	}
+}
+
+void APX_CharacterClient::Look(const FInputActionValue& Value)
+{
+	const FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+	if (Controller != nullptr)
+	{
+		AddControllerYawInput(LookAxisVector.X);
+		AddControllerPitchInput(LookAxisVector.Y);
 	}
 }
 

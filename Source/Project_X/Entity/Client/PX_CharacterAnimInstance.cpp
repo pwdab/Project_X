@@ -14,7 +14,7 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
         if (Pawn->IsLocallyControlled())
         {
-            UE_LOG(LogTemp, Log, TEXT("Locally Controlled Pawn: %s, Velocity: (%f, %f, %f)"), *Pawn->GetName(), Velocity.X, Velocity.Y, Velocity.Z);
+            //UE_LOG(LogTemp, Log, TEXT("Locally Controlled Pawn: %s, Velocity: (%f, %f, %f)"), *Pawn->GetName(), Velocity.X, Velocity.Y, Velocity.Z);
         }
     }
 }

@@ -14,6 +14,7 @@ APX_Character::APX_Character()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 250.0f;
+	CameraBoom->bUsePawnControlRotation = true;
 
 	// Setup Camera Component
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -37,11 +38,18 @@ APX_Character::APX_Character()
 		DefaultMappingContext = IMC_Default.Object;
 	}
 
-	// Setup Input Action
+	// Setup Move Input Action
 	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Move(TEXT("/Game/Project_X/Input/Action/PX_IA_Move.PX_IA_Move"));
 	if (IA_Move.Succeeded())
 	{
 		MoveAction = IA_Move.Object;
+	}
+
+	// Setup Look Input Action
+	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Look(TEXT("/Game/Project_X/Input/Action/PX_IA_Look.PX_IA_Look"));
+	if (IA_Look.Succeeded())
+	{
+		LookAction = IA_Look.Object;
 	}
 
 	// Setup AnimInstance Class
@@ -51,6 +59,12 @@ APX_Character::APX_Character()
 		AnimInstance = AnimClass.Class;
 		GetMesh()->SetAnimInstanceClass(AnimInstance);
 	}
+
+	// Setup Character Properties
+	bUseControllerRotationYaw = false;
+
+	// Setup Character Movement Component Properties
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
 // Called when the game starts or when spawned

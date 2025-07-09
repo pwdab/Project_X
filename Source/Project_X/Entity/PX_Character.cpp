@@ -23,7 +23,7 @@ APX_Character::APX_Character()
 	FollowCamera->SetRelativeRotation(FRotator(-5.0f, 0.0f, 0.0f));
 
 	// Setup Skeletal Mesh
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset(TEXT("/Game/Characters/Mannequin_UE4/Meshes/SK_Mannequin.SK_Mannequin"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset(TEXT("/Game/Project_X/Character/PX_Character/Meshes/SK_Mannequin.SK_Mannequin"));
 	if (SkeletalMeshAsset.Succeeded())
 	{
 		GetMesh()->SetSkeletalMesh(SkeletalMeshAsset.Object);
@@ -53,7 +53,7 @@ APX_Character::APX_Character()
 	}
 
 	// Setup AnimInstance Class
-	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimClass(TEXT("/Game/Characters/Mannequin_UE4/Animations/BP_PXCharacter.BP_PXCharacter_C"));
+	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimClass(TEXT("/Game/Project_X/Character/PX_Character/Animations/BP_PXCharacter.BP_PXCharacter_C"));
 	if (AnimClass.Class)
 	{
 		AnimInstance = AnimClass.Class;

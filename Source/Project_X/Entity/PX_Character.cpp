@@ -52,6 +52,20 @@ APX_Character::APX_Character()
 		LookAction = IA_Look.Object;
 	}
 
+	// Setup Aim Input Action
+	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Aim(TEXT("/Game/Project_X/Input/Action/PX_IA_Aim.PX_IA_Aim"));
+	if (IA_Aim.Succeeded())
+	{
+		AimAction = IA_Aim.Object;
+	}
+
+	// Setup Draw Input Action
+	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Draw(TEXT("/Game/Project_X/Input/Action/PX_IA_Draw.PX_IA_Draw"));
+	if (IA_Draw.Succeeded())
+	{
+		DrawAction = IA_Draw.Object;
+	}
+
 	// Setup AnimInstance Class
 	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimClass(TEXT("/Game/Project_X/Character/PX_Character/Animations/BP_PXCharacter.BP_PXCharacter_C"));
 	if (AnimClass.Class)

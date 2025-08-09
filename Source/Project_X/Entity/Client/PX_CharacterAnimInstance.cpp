@@ -19,4 +19,22 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     }
 }
 
+void UPX_CharacterAnimInstance::SetIsAiming(bool Value)
+{
+    bIsAiming = Value;
+}
 
+void UPX_CharacterAnimInstance::SetAimProgress(float Value)
+{
+    AimProgress = FMath::Clamp(Value, 0.f, 1.f);
+}
+
+void UPX_CharacterAnimInstance::SetIsDrawing(bool Value)
+{
+    bIsDrawing = Value;
+}
+
+void UPX_CharacterAnimInstance::SetDrawProgress(float Value)
+{
+    DrawProgress = FMath::Clamp(Value, 0.f, 1.f);
+}

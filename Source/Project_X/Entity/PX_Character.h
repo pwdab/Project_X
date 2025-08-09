@@ -40,6 +40,14 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	/** Aim Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* AimAction;
+
+	/** Draw Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DrawAction;
+
 	/** AnimInstance Class */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UAnimInstance> AnimInstance;
@@ -56,7 +64,7 @@ protected:
 	/** Called for movement input */
 	//void Move(const FInputActionValue& Value);
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -66,4 +74,6 @@ public:
 	FORCEINLINE UInputMappingContext* GetDefaultMappingContext() { return DefaultMappingContext; }
 	FORCEINLINE UInputAction* GetMoveAction() { return MoveAction; }
 	FORCEINLINE UInputAction* GetLookAction() { return LookAction; }
+	FORCEINLINE UInputAction* GetAimAction() { return AimAction; }
+	FORCEINLINE UInputAction* GetDrawAction() { return DrawAction; }
 };

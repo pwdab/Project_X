@@ -1,3 +1,34 @@
+# Project_X <img src="https://img.shields.io/badge/Solo-3c78d8?style=flat" align="absmiddle"/> <img src="https://img.shields.io/badge/Unreal%20Engine-0E1128?style=flat&logo=unrealengine&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/C++-00599C?style=flat&logo=cplusplus&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white" align="absmiddle"/>
+
+
+## 🎮 게임 플레이
+- **직접 플레이**   
+  
+- **플레이 영상**   
+  
+
+## 📌 프로젝트 소개
+- **프로젝트 개요**   
+- **개발 기간**   
+- **개발 상태**   
+- **개발 환경**   
+- **멤버 구성**   
+
+## 🎯 담당 업무
+
+## ⚙️ 기능 구현
+### 1. 
+- **기능 설명**:   
+- **주요 기술**:
+- **구현 방법**:
+
+## 🛠 이슈 및 해결 과정
+### 1. 
+- **문제**   
+- **원인**   
+- **해결**   
+- **결과**   
+
 ## 프로젝트 구조
 ```plaintext
 Source/

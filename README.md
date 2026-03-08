@@ -1,3 +1,131 @@
+<a id="project_x"></a>
+# [Project_X](#index) <img src="https://img.shields.io/badge/Solo-3c78d8?style=flat" align="absmiddle"/> <img src="https://img.shields.io/badge/Unreal%20Engine-0E1128?style=flat&logo=unrealengine&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/C++-00599C?style=flat&logo=cplusplus&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white" align="absmiddle"/>
+
+<div align="center"><h3><strong><em>구현을 넘어 설계와 구조로, 나만의 TPS 멀티플레이 템플릿을 만들어 갑니다</em></strong></h3></div>
+
+<p align="center">
+	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/Project_X.png" alt="Project_X" width="75%">
+	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features1.gif" width="40%">
+	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features2.gif" width="35%">
+	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features3.gif" width="20%">
+</p>
+
+
+## 📌 프로젝트 소개
+- **프로젝트 유형**: 개인 프로젝트 게임 개발 (프로그래밍 1명)
+- **프로젝트 목적**: 단순 기능 구현보다 깔끔하고 가독성 좋은 코드, 설계와 구조화에 집중하는 것을 목표로 함
+- **본인 역할**: 프로그래밍
+- **게임 장르**: 3D 멀티플레이 TPS
+- **게임 개요**: TPS 멀티플레이 게임의 공통 시스템을 설계·구현하며, C++ 기반 설계·코드 품질·모듈화·확장성에 집중
+- **개발 기간**: 2025.04.11 ~ 진행 중
+- **개발 상태**: 개발 중
+- **개발 환경**: Unreal 5.4.4, Windows 10
+- **주요 기술**: Unreal Engine 5, C++
+
+## 프로젝트 구조
+```plaintext
+Source/
+├── Project_X/
+│   │   ├── Component/												# 컴포넌트
+│   │   │   ├── Inventory/
+│   │   │   │   ├── Client/
+│   │   │   │   │   ├── PX_InventroyComponentClient.cpp
+│   │   │   │   │   ├── PX_ItemInstanceClient.cpp
+│   │   │   │   │   ├── PX_WeaponItemInstanceClient.cpp
+│   │   │   │   ├── Server/
+│   │   │   │   │   ├── PX_InventoryComponentServer.cpp
+│   │   │   │   │   ├── PX_ItemInstanceServer.cpp
+│   │   │   │   │   ├── PX_WeaponItemInstanceServer.cpp
+│   │   │   │   ├── PX_InventoryComponent.h							# 인벤토리 컴포넌트
+│   │   │   │   ├── PX_InventoryComponent.cpp
+│   │   │   │   ├── PX_ItemDataAsset.h								# 아이템 사용자 정의 데이터
+│   │   │   │   ├── PX_ItemDataAsset.cpp
+│   │   │   │   ├── PX_ItemInstance.h								# 아이템 인스턴스
+│   │   │   │   ├── PX_ItemInstance.cpp
+│   │   │   │   ├── PX_WeaponItemInstance.h							# 아이템 인스턴스를 부모 클래스로 하는 무기 인스턴스
+│   │   │   │   ├── PX_WeaponItemInstanec.cpp
+│   │   │   ├── Weapon/												
+│   │   │   │   ├── Client/
+│   │   │   │   │   ├── Driver/										# 무기에 따른 애니메이션 재생
+│   │   │   │   │   │   ├── PX_WeaponAnimDriver.h
+│   │   │   │   │   │   ├── PX_WeaponAnimDriver.cpp
+│   │   │   │   │   ├── Handler/									# 무기에 따른 애니메이션 컨텍스트 생성
+│   │   │   │   │   │   ├── PX_WeaponActionHandler.h
+│   │   │   │   │   │   ├── PX_WeaponActionHandler.cpp
+│   │   │   │   │   ├── Notify/										# 무기의 애님 노티파이
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponCommit.h
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponCommit.cpp
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponEquipEnd.h
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponEquipEnd.cpp
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponReloadEnd.h
+│   │   │   │   │   │   ├── PX_AnimNotifyWeaponReloadEnd.cpp
+│   │   │   │   │   ├── PX_WeaponSystemComponentClient.cpp
+│   │   │   │   ├── Server/
+│   │   │   │   │   ├── PX_WeaponSystemComponentServer.cpp
+│   │   │   │   ├── PX_WeaponDataAsset.h							# 무기 데이터 에셋 사용자 정의 데이터
+│   │   │   │   ├── PX_WeaponSystemComponent.h						# 무기 컴포넌트
+│   │   │   │   ├── PX_WeaponSystemComponent.cpp
+│   │   │   │   ├── PX_WeaponTypes.h								# 무기 사용자 정의 데이터
+│   │   ├── Entity/													# 액터
+│   │   │   │   ├── Client/
+│   │   │   │   │   ├── PX_CharacterAnimInstance.h					# 캐릭터 애님 인스턴스
+│   │   │   │   │   ├── PX_CharacterAnimInstance.cpp
+│   │   │   │   │   ├── PX_CharacterClient.cpp
+│   │   │   │   │   ├── PX_CharacterLayerAnimInstance.h				# 캐릭터 레이어 애님 인스턴스
+│   │   │   │   │   ├── PX_CharacterLayerAnimInstance.h
+│   │   │   │   ├── Server/
+│   │   │   │   │   ├── PX_CharacterServer.cpp
+│   │   │   │   ├── PX_Character.h									# 월드에 스폰하는 캐릭터 액터
+│   │   │   │   ├── PX_Character.cpp
+│   │   │   │   ├── PX_Item.h										# 월드에 스폰하는 아이템 액터
+│   │   │   │   ├── PX_Item.cpp
+│   │   │   │   ├── PX_Projectile.h									# 월드에 스폰하는 투사체 액터
+│   │   │   │   ├── PX_Projectile.cpp
+│   │   │   │   ├── PX_Weapon.h										# 월드에 스폰하는 무기 액터
+│   │   │   │   ├── PX_Weapon.cpp
+│   │   ├── Framework/												# 프레임워크
+│   │   │   │   ├── Controller/
+│   │   │   │   │   ├── PX_PlayerController.h						# 플레이어 컨트롤러
+│   │   │   │   │   ├── PX_PlayerController.cpp
+│   │   │   │   ├── GameMode/
+│   │   │   │   │   ├── PX_MainGameMode.h							# 메인 게임 모드
+│   │   │   │   │   ├── PX_MainGameMode.cpp
+│   │   │   │   ├── HUD/
+│   │   │   │   │   ├── PX_HUD.h									# 메인 HUD
+│   │   │   │   │   ├── PX_HUD.cpp
+│   │   ├── Subsystem/												# 서브 시스템
+│   │   │   │   ├── PX_WeaponCommitSubsystem.h						# 무기 컴포넌트의 액션 커밋을 60Hz로 실행
+│   │   │   │   ├── PX_WeaponCommitSubsystem.cpp
+│   │   ├── UI/														# UI
+│   │   │   │   ├── HUD/											# HUD
+│   │   │   │   │   ├── PX_CurrentWeaponWidget.h					# 현재 무기 HUD
+│   │   │   │   │   ├── PX_CurrentWeaponWidget.cpp
+│   │   │   │   │   ├── PX_HUDWidget.h								# 전체 HUD
+│   │   │   │   │   ├── PX_HUDWidget.cpp
+│   │   │   │   │   ├── PX_KeyIconWidget.h							# 키보드 키를 나타내는 아이콘
+│   │   │   │   │   ├── PX_KeyIconWidget.cpp
+│   │   │   │   │   ├── PX_WeaponIconWidget.h						# 무기를 나타내는 아이콘
+│   │   │   │   │   ├── PX_WeaponIconWidget.cpp
+│   │   │   │   │   ├── PX_WeaponListsWidget.h						# 소유하고 있는 무기 리스트
+│   │   │   │   │   ├── PX_WeaponListsWidget.cpp
+│   │   │   │   │   ├── PX_WeaponListWidget.h						# 소유하고 있는 무기
+│   │   │   │   │   ├── PX_WeaponListWidget.cpp
+│   │   │   │   ├── Inventory/										# 인벤토리 UI
+│   │   │   │   │   ├── PX_InventoryItemSlotsWidget.h				# 아이템 인벤토리
+│   │   │   │   │   ├── PX_InventoryItemSlotsWidget.cpp
+│   │   │   │   │   ├── PX_InventorySlotWidget.h					# 개별 슬롯
+│   │   │   │   │   ├── PX_InventorySlotWidget.cpp
+│   │   │   │   │   ├── PX_InventoryWeaponSlotsWidget.h				# 무기 인벤토리
+│   │   │   │   │   ├── PX_InventoryWeaponSlotsWidget.cpp
+│   │   │   │   │   ├── PX_InventoryWidget.h						# 전체 인벤토리
+└── └── └── └── └── └── PX_InventoryWidget.cpp
+
+<br>
+
+---
+
+<br>
+
 <a id="action-system"></a>
 ## [1. Action 기반 멀티플레이 행동 처리 시스템](#index) 
 

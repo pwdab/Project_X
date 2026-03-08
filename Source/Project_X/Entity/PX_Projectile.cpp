@@ -10,19 +10,24 @@
 #include "GameFramework/SpringArmComponent.h"				// Debug Camera
 #include "Component/PX_WeaponComponent.h"
 #include "Entity/PX_Character.h"
+#include "Kismet/GameplayStatics.h"							// ApplyDamage
+#include "Net/UnrealNetwork.h"								// Replication
 
 // Sets default values
 APX_Projectile::APX_Projectile()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Setup Sphere Component
 	SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
-	SphereCollision->SetGenerateOverlapEvents(true);
+	//SphereCollision->SetGenerateOverlapEvents(true);
+	SphereCollision->SetNotifyRigidBodyCollision(true);		// OnHit()
 	SphereCollision->SetSphereRadius(2.f);
-	SphereCollision->BodyInstance.SetCollisionProfileName(TEXT("BlockAll"));
+	//SphereCollision->SetCollisionProfileName(TEXT("BlockAll"));
+	SphereCollision->SetCollisionProfileName("PX_Combat");
 	SphereCollision->OnComponentHit.AddDynamic(this, &APX_Projectile::OnHit);
+	//SphereCollision->bHiddenInGame = false;
 	RootComponent = SphereCollision;
 
 	// Setup Static Mesh Component
@@ -31,13 +36,13 @@ APX_Projectile::APX_Projectile()
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Mesh->SetRelativeLocation(FVector(-92.5f, 0.f, 0.f));
 	Mesh->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
-	
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> StaticMeshAsset(TEXT("/Game/Project_X/Character/Weapon/SM_Arrow.SM_Arrow"));
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> StaticMeshAsset(TEXT("/Game/Project_X/Character/Weapon/Bow/SM_Arrow.SM_Arrow"));
 	if (StaticMeshAsset.Succeeded())
 	{
 		GetMesh()->SetStaticMesh(StaticMeshAsset.Object);
 	}
-	
+
 	// Setup Projectile Movement Component
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovement->UpdatedComponent = SphereCollision;
@@ -66,11 +71,18 @@ APX_Projectile::APX_Projectile()
 	//SetReplicateMovement(true);
 }
 
+void APX_Projectile::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APX_Projectile, bDisableProjectile);
+}
+
 // Called when the game starts or when spawned
 void APX_Projectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 #if !UE_SERVER
 	// Debug Camera
 	if (!FollowCamera) return;
@@ -106,9 +118,36 @@ void APX_Projectile::OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor
 	if (!HasAuthority()) return;
 	//UE_LOG(LogTemp, Log, TEXT("Projectile On Hit"));
 
+	bDisableProjectile = true;
+	DisableProjectile();					// Disable Collision at Server
+
+	UGameplayStatics::ApplyDamage(
+		OtherActor,						// Actor that will be damaged
+		20.0f,							// The base damage to apply
+		GetInstigatorController(),		// Controller that was responsible for causing this damage
+		this,							// Actor that actually caused the damage
+		UDamageType::StaticClass()		// Class that describes the damage that was done
+	);
+
+	//AttachToComponent(OtherComp, FAttachmentTransformRules::KeepWorldTransform);
+
+	if (USkeletalMeshComponent* SkeletalMesh = Cast<USkeletalMeshComponent>(OtherComp))
+	{
+		AttachToComponent(SkeletalMesh, FAttachmentTransformRules::KeepWorldTransform, Hit.BoneName);
+		UE_LOG(LogTemp, Log, TEXT("%s gives %f damage to %s at %s"), *this->GetName(), 20.0f, *OtherActor->GetName(), *Hit.BoneName.ToString());
+	}
+	else if (OtherComp)
+	{
+		AttachToComponent(OtherComp, FAttachmentTransformRules::KeepWorldTransform);
+		UE_LOG(LogTemp, Log, TEXT("Attached to %s"), *OtherActor->GetName());
+	}
+
+	// (ì˜µì…˜) 5ì´ˆ ë’¤ ì œê±°
+	//SetLifeSpan(10.f);
+
 	/*
-	* Blend TimeÀÌ ³¡³ª±â Àü¿¡ PX_Character·Î µ¹¾Æ°¡¾ß ÇÏ´Â »óÈ²¿¡´Â CurrentViewTargetÀÌ PX_Character¿¡¼­ Projectile·Î ¾ÆÁ÷ º¯ÇÏÁö ¾Ê¾ÒÀ¸¹Ç·Î
-	* OnHitÀÌ È£ÃâµÇ¾îµµ Projectile¿¡¼­ PX_Character·Î Ä«¸Ş¶ó ÀüÈ¯ÀÌ ÀÌ·ç¾îÁöÁö ¾ÊÀ½
+	* Blend Timeì´ ëë‚˜ê¸° ì „ì— PX_Characterë¡œ ëŒì•„ê°€ì•¼ í•˜ëŠ” ìƒí™©ì—ëŠ” CurrentViewTargetì´ PX_Characterì—ì„œ Projectileë¡œ ì•„ì§ ë³€í•˜ì§€ ì•Šì•˜ìœ¼ë¯€ë¡œ
+	* OnHitì´ í˜¸ì¶œë˜ì–´ë„ Projectileì—ì„œ PX_Characterë¡œ ì¹´ë©”ë¼ ì „í™˜ì´ ì´ë£¨ì–´ì§€ì§€ ì•ŠìŒ
 	APawn* Pawn = Cast<APawn>(GetOwner());
 	APlayerController* PlayerController = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (PlayerController)
@@ -123,9 +162,9 @@ void APX_Projectile::OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor
 	}
 	*/
 
-	ClientCameraTransition(GetOwner());
-	
-	// ¼­¹ö°¡ ¹ŞÀº Å¬¶óÀÌ¾ğÆ® Á¶ÁØÀÇ Ãæµ¹ ÁöÁ¡ (»¡°£ ±¸)
+	//ClientCameraTransition(GetOwner());
+
+	// ì„œë²„ê°€ ë°›ì€ í´ë¼ì´ì–¸íŠ¸ ì¡°ì¤€ì˜ ì¶©ëŒ ì§€ì  (ë¹¨ê°„ êµ¬)
 	//DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 4.0f, 16, FColor::Red, false, 2.f);
 }
 
@@ -135,10 +174,48 @@ void APX_Projectile::ClientCameraTransition_Implementation(AActor* TargetActor)
 	APlayerController* PlayerController = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (!Pawn || !PlayerController)	return;
 
-	UE_LOG(LogTemp, Log, TEXT("ClientCameraTransition"));
-	UE_LOG(LogTemp, Log, TEXT("Owner: % s, PlayerController : %s, TargetActor : %s"), *Pawn->GetName(), *PlayerController->GetName(), *TargetActor->GetName());
+	//UE_LOG(LogTemp, Log, TEXT("ClientCameraTransition"));
+	//UE_LOG(LogTemp, Log, TEXT("Owner: % s, PlayerController : %s, TargetActor : %s"), *Pawn->GetName(), *PlayerController->GetName(), *TargetActor->GetName());
 
 	// Camera Transition to Target Actor
 	const float TransitionTime = TargetActor->IsA<APX_Character>() ? 0.f : 0.25f;
 	PlayerController->SetViewTargetWithBlend(TargetActor, TransitionTime, VTBlend_Cubic);
+}
+
+void APX_Projectile::OnRep_DisableProjectile()
+{
+	DisableProjectile();
+}
+
+void APX_Projectile::DisableProjectile()
+{
+	/*
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Collision Disabled in Server"));
+	}
+	else
+	{
+		FString Temp = GetWorld()->GetMapName();
+		Temp.RemoveFromStart(TEXT("UEDPIE_"));
+
+		FString Idx;
+		if (Temp.Split(TEXT("_"), &Idx, nullptr))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Collision Disabled in Client %d"), FCString::Atoi(*Idx));
+		}
+	}
+	*/
+
+	// Deactivate Projectile Movement
+	if (ProjectileMovement)
+	{
+		ProjectileMovement->Deactivate();
+	}
+
+	// Set Sphere Collision to No Collision
+	if (SphereCollision)
+	{
+		SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 }

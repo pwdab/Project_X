@@ -24,9 +24,11 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientCameraTransition(AActor* TargetActor);
 
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	UFUNCTION()
 	void OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
@@ -56,6 +58,16 @@ private:
 	/** Follow camera */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Projectile, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera = nullptr;
+
+	// --- Replicated Variables -----------------------------------------------------
+	UPROPERTY(ReplicatedUsing = OnRep_DisableProjectile)
+	bool bDisableProjectile = false;
+
+	// --- OnRep Functions -----------------------------------------------------
+	UFUNCTION()
+	void OnRep_DisableProjectile();
+
+	void DisableProjectile();
 
 public:
 	FORCEINLINE USphereComponent* GetSphereCollision() const { return SphereCollision; }

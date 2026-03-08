@@ -6,6 +6,8 @@
 #include "Animation/AnimInstance.h"
 #include "PX_CharacterAnimInstance.generated.h"
 
+enum class EMoveDirection : uint8;
+
 /**
  * 
  */
@@ -16,6 +18,12 @@ class PROJECT_X_API UPX_CharacterAnimInstance : public UAnimInstance
 	
 public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Aim")
+	void SetIsJumping(bool Value);
+
+	UFUNCTION(BlueprintCallable, Category = "Aim")
+	void SetIsCrouching(bool Value);
 
     UFUNCTION(BlueprintCallable, Category = "Aim")
 	void SetIsAiming(bool Value);
@@ -28,6 +36,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Aim")
 	void SetDrawProgress(float Value);
+	UFUNCTION(BlueprintCallable, Category = "Aim")
+	void SetIsReloading(bool Value);
 	
 private:
 	UFUNCTION()
@@ -36,25 +46,45 @@ private:
 	UFUNCTION()
 	void AnimNotify_ReloadEnd();
 
+	UFUNCTION()
+	void AnimNotify_TurnEnd();
+
+	FVector2D MoveDirectionToVector2D(EMoveDirection MoveDirection);
+
 	// --- Character -----------------------------------------------------
 	/** Character's Velocity **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
 	FVector Velocity = FVector::ZeroVector;
+	/** Is Character Have Input **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bHasInput = false;
+	/** Character's Last Forward Velocity **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	float LastForwardVelocity = 0.f;
+	/** Character's Last Right Velocity **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	float LastRightVelocity = 0.f;
+	/** Is Character Jumping **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bIsJumping = false;
+	/** Is Character Falling **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bIsFalling = false;
+	/** Is Character Crouching **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bIsCrouching = false;
 
 	// --- Aiming -----------------------------------------------------
 	/** Is Character Aiming **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	bool bIsAiming = false;
-
 	/** Character's Aiming Yaw **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	float AimYaw = 0.f;
-
 	/** Character's Aiming Pitch **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	float AimPitch = 0.f; 
-
-	// »∞¿ª µÈæÓø√∏∞ ¡§µµ
+	// ÌôúÏùÑ Îì§Ïñ¥Ïò¨Î¶∞ Ï†ïÎèÑ
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	float AimProgress = 0.f;
 
@@ -62,11 +92,9 @@ private:
 	/** Is Character Drawing **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	bool bIsDrawing = false;
-
-	// »∞Ω√¿ß∏¶ ¥Á±‰ ¡§µµ
+	// ÌôúÏãúÏúÑÎ•º ÎãπÍ∏¥ Ï†ïÎèÑ
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	float DrawProgress = 0.f;
-
 	/** Is Character Reloading **/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bow", meta = (AllowPrivateAccess = "true"))
 	bool bIsReloading = false;

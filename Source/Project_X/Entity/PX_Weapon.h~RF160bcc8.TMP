@@ -1,0 +1,73 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "Project_X.h"
+#include "GameFramework/Actor.h"
+#include "PX_Weapon.generated.h"
+
+class USkeletalMeshComponent;
+class UPX_WeaponDataAsset;
+class UAnimInstance;
+
+UCLASS()
+class PROJECT_X_API APX_Weapon : public AActor
+{
+	GENERATED_BODY()
+	
+public:	
+	// Sets default values for this actor's properties
+	APX_Weapon();
+
+	/** Initialize this weapon's mesh/anim from data asset (called by WeaponSystem). */
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void InitializeFromData(UPX_WeaponDataAsset* InWeaponData);
+
+	/*
+	UFUNCTION(Server, Reliable)
+	void ServerInitializeFromData(UPX_WeaponDataAsset* InWeaponData);
+	*/
+
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
+public:	
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
+private:
+	// --- Replicated Variables ---------------------------------------------------
+	/** Ammo in magazine. */
+	UPROPERTY(Replicated)
+	int32 AmmoInMag = 0;
+	/** Current weapon's fire mode. */
+	UPROPERTY(ReplicatedUsing = OnRep_FireModeUpdated)
+	EPXWeaponAttackMode CurrentFireMode = EPXWeaponAttackMode::Single;
+	UPROPERTY(ReplicatedUsing = OnRep_AmmoUpdated)
+
+
+
+	/** The main skeletal mesh associated with this Actor */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> Mesh;
+
+	/** Data that initialized this weapon (non-authoritative reference, mainly for debug). */
+	UPROPERTY(Transient)
+	TObjectPtr<UPX_WeaponDataAsset> WeaponData;
+
+	
+
+	/*
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USceneComponent> Muzzle;
+	*/
+	
+public:
+	FORCEINLINE USkeletalMeshComponent* GetMesh() const { return Mesh; }
+	FORCEINLINE UAnimInstance* GetAnimInstance() const { return Mesh->GetAnimInstance(); }
+	FORCEINLINE UPX_WeaponDataAsset* GetWeaponData() const { return WeaponData; }
+	//FORCEINLINE FTransform GetMuzzleTransform() const { return Muzzle ? Muzzle->GetComponentTransform() : GetActorTransform(); }
+	//FORCEINLINE FVector GetMuzzleLocation() const { return Muzzle ? Muzzle->GetComponentLocation() : GetActorLocation(); }
+	//FORCEINLINE FRotator GetMuzzleRotation() const { return Muzzle ? Muzzle->GetComponentRotation() : GetActorRotation(); }
+};

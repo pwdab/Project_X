@@ -24,8 +24,8 @@
 문제의 원인은 기존 **행동 처리 구조**에 있었습니다.
 
 <p align="center">
-	<img src="images/3.0/ActionSystem/before_structure.png" width="55%">
-	<img src="images/3.0/ActionSystem/before_sequence.png" width="80%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/before_structure.png" width="65%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/before_sequence.png" width="80%">
 </p>
 
 - Character의 과도한 책임   
@@ -46,8 +46,8 @@
 **1\. Character 책임 분리**
 
 <p align="center">
-	<img src="images/3.0/ActionSystem/after_structure.png" width="75%">
-	<img src="images/3.0/ActionSystem/after_sequence.png" width="100%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/after_structure.png" width="75%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/after_sequence.png" width="80%">
 </p>
 
 <strong>`Character`</strong> 중심 구조를 다음과 같이 역할 기반 구조로 분리했습니다.
@@ -66,8 +66,8 @@
 **2\. 행동 처리 구조 통합**
 
 <p align="center">
-	<img src="images/3.0/ActionSystem/action_context.png" width="25%">
-	<img src="images/3.0/ActionSystem/action_pipeline.png" width="100%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/action_context.png" width="25%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/ActionSystem/action_pipeline.png" width="100%">
 </p>
 
 행동을 공통 데이터 구조인 <strong>`ActionContext`</strong>로 표현하고, 모든 행동이 동일한 처리 파이프라인을 거치도록 설계했습니다.
@@ -140,7 +140,7 @@ Action 기반 구조를 도입한 결과 다음과 같은 효과를 얻었습니
 문제의 원인은 기존 **인벤토리 Replication 구조**에 있었습니다.
 
 <p align="center">
-	<img src="images/3.0/InventorySystem/before_replication.png" width="25%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/InventorySystem/before_replication.png" width="50%">
 </p>
 
 **TArray 기반 Replication**   
@@ -199,7 +199,7 @@ Unreal Engine의 **Fast Array Replication**을 활용하여 인벤토리 동기�
 **2\. 슬롯 단위 Replication 구조 도입**
 
 <p align="center">
-	<img src="images/3.0/InventorySystem/after_replication.png" width="25%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/InventorySystem/after_replication.png" width="65%">
 </p>
 
 슬롯 변경 시 <strong>`MarkItemDirty()`</strong>을 호출해 변경된 슬롯만 Replication 되도록 구조를 개선했습니다.
@@ -210,7 +210,7 @@ Unreal Engine의 **Fast Array Replication**을 활용하여 인벤토리 동기�
 **3\. 슬롯 변경 이벤트 기반 동기화**
 
 <p align="center">
-	<img src="images/3.0/InventorySystem/after_sequence.png" width="25%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/3.0/InventorySystem/after_sequence.png" width="70%">
 </p>
 
 ```C++

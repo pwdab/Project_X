@@ -1,13 +1,10 @@
 <a id="project_x"></a>
 # [Project_X](#index) <img src="https://img.shields.io/badge/Solo-3c78d8?style=flat" align="absmiddle"/> <img src="https://img.shields.io/badge/Unreal%20Engine-0E1128?style=flat&logo=unrealengine&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/C++-00599C?style=flat&logo=cplusplus&logoColor=white" align="absmiddle"/> <img src="https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white" align="absmiddle"/>
 
-<div align="center"><h3><strong><em>구현을 넘어 설계와 구조로, 나만의 TPS 멀티플레이 템플릿을 만들어 갑니다</em></strong></h3></div>
-
 <p align="center">
-	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/Project_X.png" alt="Project_X" width="75%">
-	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features1.gif" width="40%">
-	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features2.gif" width="35%">
-	<img src="https://github.com/pwdab/Portfolio/blob/main/images/Project_X/features3.gif" width="20%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/Project_X/features4.gif" width="32%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/Project_X/features5.gif" width="32%">
+	<img src="https://github.com/pwdab/Portfolio/blob/ver-3.0/images/Project_X/features6.gif" width="32%">
 </p>
 
 

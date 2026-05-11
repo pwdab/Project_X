@@ -40,7 +40,7 @@
 	- **Animation Blueprint, AnimMontage, AnimNotify**를 활용한 **전투 애니메이션** 연동
 	- **UMG**와 **Custom UI Material**을 활용한 HP, 탄약, 쿨타임, 상태 변화 시각화
 
-### 추가 정보
+<br>
 
 ## 프로젝트 구조
 

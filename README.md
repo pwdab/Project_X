@@ -179,9 +179,3 @@ Source/
 ```
 
 </details>
-
-<br>
-
----
-
-<br>

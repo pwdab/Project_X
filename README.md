@@ -20,7 +20,7 @@
 </p>
 
 
-## 📌 프로젝트 소개
+## 프로젝트 소개
 - **프로젝트 유형**: 3D 멀티플레이 TPS 게임 개발 프로젝트 (개인 프로젝트)
 - **본인 역할**: 게임 클라이언트 프로그래밍
 - **개발 기간**: 2025.04.11 ~ 진행 중
@@ -43,6 +43,10 @@
 ### 추가 정보
 
 ## 프로젝트 구조
+
+<details>
+<summary>프로젝트 구조 보기</summary>
+
 ```plaintext
 Source/
 └── Project_X/
@@ -173,6 +177,8 @@ Source/
             ├── PX_InventoryWeaponSlotsWidget.h/.cpp        # 무기 슬롯 목록
             └── PX_InventorySlotWidget.h/.cpp               # 개별 인벤토리 슬롯
 ```
+
+</details>
 
 <br>
 

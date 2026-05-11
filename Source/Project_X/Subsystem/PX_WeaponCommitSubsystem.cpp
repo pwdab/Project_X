@@ -43,7 +43,7 @@ void UPX_WeaponCommitSubsystem::Tick(float DeltaTime)
                 It.RemoveCurrent();
                 continue;
             }
-            It->Get()->ServerCommitAction((float)Step);
+            //It->Get()->ServerCommitAction((float)Step);
         }
     }
 }

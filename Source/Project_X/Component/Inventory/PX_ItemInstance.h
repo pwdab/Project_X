@@ -9,13 +9,13 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(PX_ItemInstance, Log, All);
 
-//class UPX_ItemDataAsset;
 struct FPX_ItemData;
+class UPX_EquippableItemDataAsset;
+class UPX_WeaponDataAsset;
 
 /**
  * 
  */
-//UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 UCLASS()
 class PROJECT_X_API UPX_ItemInstance : public UObject
 {
@@ -28,7 +28,6 @@ public:
 	virtual bool IsSupportedForNetworking() const override { return true; }
 
 	// --- Server Functions ---------------------------------------------------
-	//virtual UPX_ItemInstance* ServerClone(UObject* NewOuter) const;
 	virtual FPX_ItemData MakeDropData() const;
 	virtual void ApplyDropData(const FPX_ItemData& Data);
 	void SetQuantity(const int32 InQuantity);
@@ -37,7 +36,13 @@ public:
 	FORCEINLINE FGuid GetInstanceId() const { return InstanceId; }
 	FORCEINLINE int32 GetQuantity() const { return Quantity; }
 	FORCEINLINE UPX_ItemDataAsset* GetItemDataAsset() const { return ItemDataAsset.Get(); }
-	FORCEINLINE FString GetSafeName() const { return (ItemDataAsset && !ItemDataAsset->DisplayName.IsEmpty()) ? *ItemDataAsset->DisplayName.ToString() : TEXT("None"); }
+	//FORCEINLINE UPX_EquippableItemDataAsset* GetEquippableItemDataAsset() const { Cast<UPX_EquippableItemDataAsset>(ItemDataAsset); }
+	UPX_EquippableItemDataAsset* GetEquippableItemDataAsset() const;
+	//FORCEINLINE UPX_WeaponDataAsset* GetWeaponDataAsset() const { Cast<UPX_WeaponDataAsset>(ItemDataAsset); }
+	UPX_WeaponDataAsset* GetWeaponDataAsset() const;
+	FORCEINLINE bool IsWeaponItem() const { return ItemDataAsset && ItemDataAsset->IsWeaponItem(); }
+	FORCEINLINE bool IsEquippableItem() const { return ItemDataAsset && ItemDataAsset->IsEquippableItem(); }
+	FORCEINLINE FString GetSafeName() const { return (ItemDataAsset && !ItemDataAsset->ItemName.IsEmpty()) ? *ItemDataAsset->ItemName.ToString() : TEXT("None"); }
 
 protected:
 	// --- Server Functions ---------------------------------------------------
@@ -61,4 +66,6 @@ protected:
 private:
 	// --- Common Functions -----------------------------------------------------
 	//bool HasServerAuthority() const;
+
+
 };

@@ -3,6 +3,8 @@
 
 #include "Component/Inventory/PX_ItemInstance.h"
 #include "Net/UnrealNetwork.h"
+#include "Component/Inventory/PX_EquippableItemDataAsset.h"
+#include "Component/Weapon/PX_WeaponDataAsset.h"
 
 DEFINE_LOG_CATEGORY(PX_ItemInstance);
 
@@ -34,3 +36,13 @@ bool UPX_ItemInstance::HasServerAuthority() const
     return false;
 }
 */
+
+UPX_EquippableItemDataAsset* UPX_ItemInstance::GetEquippableItemDataAsset() const
+{
+    return Cast<UPX_EquippableItemDataAsset>(ItemDataAsset);
+}
+
+UPX_WeaponDataAsset* UPX_ItemInstance::GetWeaponDataAsset() const
+{ 
+    return Cast<UPX_WeaponDataAsset>(ItemDataAsset);
+}

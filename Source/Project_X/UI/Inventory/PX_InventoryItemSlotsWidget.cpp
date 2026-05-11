@@ -3,6 +3,7 @@
 
 #include "UI/Inventory/PX_InventoryItemSlotsWidget.h"
 #include "UI/Inventory/PX_InventorySlotWidget.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 #include "Component/Inventory/PX_InventoryComponent.h"
 #include "Components/PanelWidget.h"
 
@@ -22,7 +23,7 @@ void UPX_InventoryItemSlotsWidget::InitSlotMeta()
     {
         if ( UPX_InventorySlotWidget* SlotWidget = Cast<UPX_InventorySlotWidget>(SlotsPanel->GetChildAt(i)) )
         {
-            SlotWidget->SetSlotMeta(EPXInventorySlotTarget::Item, i);
+            SlotWidget->SetSlotMeta(PX_GameplayTags::Item_Inventory_General, i);
         }
     }
 }

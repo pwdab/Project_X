@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Project_X.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/Actor.h"
 #include "Component/Weapon/PX_WeaponTypes.h"
 #include "PX_Item.generated.h"
@@ -34,7 +35,8 @@ struct FPX_ItemData
 	int32 AmmoInMag = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EPXWeaponAttackMode AttackMode = EPXWeaponAttackMode::None;
+	//EPXWeaponAttackMode AttackMode = EPXWeaponAttackMode::None;
+	FGameplayTag AttackModeTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float Durability = -1.0f;

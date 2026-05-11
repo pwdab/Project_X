@@ -73,8 +73,8 @@ void FPXInventorySlotArray::PostReplicatedChange(const TArrayView<int32>& Change
 		if ( Owner && Slots.IsValidIndex(Index) )
 		{
 			//PX_LOG(Log, TEXT(""));
-			Owner->OnSlotUpdated(Index, Target);
-			Owner->OnInventorySlotUpdated.Broadcast(Target, Index, Slots[Index]);
+			Owner->OnSlotUpdated(Index, TargetTag);
+			Owner->OnInventorySlotUpdated.Broadcast(TargetTag, Index, Slots[Index]);
 		}
 	}
 }
@@ -87,8 +87,8 @@ void FPXInventorySlotArray::PostReplicatedAdd(const TArrayView<int32>& AddedIndi
 		if ( Owner && Slots.IsValidIndex(Index) )
 		{
 			//PX_LOG(Log, TEXT(""));
-			Owner->OnSlotAdded(Index, Target);
-			Owner->OnInventorySlotUpdated.Broadcast(Target, Index, Slots[Index]);
+			Owner->OnSlotAdded(Index, TargetTag);
+			Owner->OnInventorySlotUpdated.Broadcast(TargetTag, Index, Slots[Index]);
 		}
 	}
 }
@@ -100,60 +100,69 @@ void FPXInventorySlotArray::PostReplicatedRemove(const TArrayView<int32>& Remove
 	{
 		if ( Owner && Slots.IsValidIndex(Index) )
 		{
-			Owner->OnSlotRemoved(Index, Target);
+			Owner->OnSlotRemoved(Index, TargetTag);
 			//Owner->OnInventorySlotsReset.Broadcast();
 		}
 	}
 }
 
-void UPX_InventoryComponent::OnSlotUpdated(int32 SlotIndex, EPXInventorySlotTarget Target)
+//void UPX_InventoryComponent::OnSlotUpdated(int32 SlotIndex, EPXInventorySlotTarget Target)
+void UPX_InventoryComponent::OnSlotUpdated(int32 SlotIndex, FGameplayTag TargetTag)
 {
 	//PX_LOG(Log, TEXT("%s[%d] Updated"), *SlotName.ToString(), SlotIndex);
 	
-	FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	//FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	FPXInventorySlotArray* TargetInventory = FindInventoryArrayByTag(TargetTag);
+	if ( !TargetInventory ) return;
 
-	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(Target);
+	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(TargetTag);
 
 	UPX_ItemInstance* OldItem = PrevInventory.Contains(SlotIndex) ? PrevInventory[SlotIndex] : nullptr;
-	UPX_ItemInstance* NewItem = TargetInventory.Slots.IsValidIndex(SlotIndex) ? TargetInventory.Slots[SlotIndex].ItemInstance : nullptr;
+	UPX_ItemInstance* NewItem = TargetInventory->Slots.IsValidIndex(SlotIndex) ? TargetInventory->Slots[SlotIndex].ItemInstance : nullptr;
 
 	const FString OldName = OldItem ? OldItem->GetSafeName() : TEXT("None");
 	const FString NewName = NewItem ? NewItem->GetSafeName() : TEXT("None");
 
-	PX_LOG(Log, TEXT("%s[%d] Changed | Old: %s -> New: %s"), *TargetInventory.DebugName.ToString(), SlotIndex, *OldName, *NewName);
+	PX_LOG(Log, TEXT("%s[%d] Changed | Old: %s -> New: %s"), *TargetInventory->DebugName.ToString(), SlotIndex, *OldName, *NewName);
 
 	PrevInventory.Add(SlotIndex, NewItem);
 	// UI 갱신
 }
 
-void UPX_InventoryComponent::OnSlotAdded(int32 SlotIndex, EPXInventorySlotTarget Target)
+//void UPX_InventoryComponent::OnSlotAdded(int32 SlotIndex, EPXInventorySlotTarget Target)
+void UPX_InventoryComponent::OnSlotAdded(int32 SlotIndex, FGameplayTag TargetTag)
 {
-	FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	//FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	FPXInventorySlotArray* TargetInventory = FindInventoryArrayByTag(TargetTag);
+	if ( !TargetInventory ) return;
 
-	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(Target);
+	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(TargetTag);
 
 	UPX_ItemInstance* OldItem = PrevInventory.Contains(SlotIndex) ? PrevInventory[SlotIndex] : nullptr;
-	UPX_ItemInstance* NewItem = TargetInventory.Slots.IsValidIndex(SlotIndex) ? TargetInventory.Slots[SlotIndex].ItemInstance : nullptr;
+	UPX_ItemInstance* NewItem = TargetInventory->Slots.IsValidIndex(SlotIndex) ? TargetInventory->Slots[SlotIndex].ItemInstance : nullptr;
 
 	const FString OldName = OldItem ? OldItem->GetSafeName() : TEXT("None");
 	const FString NewName = NewItem ? NewItem->GetSafeName() : TEXT("None");
 
-	PX_LOG(Log, TEXT("%s[%d] Add | Old: %s -> New: %s"), *TargetInventory.DebugName.ToString(), SlotIndex, *OldName, *NewName);
+	PX_LOG(Log, TEXT("%s[%d] Add | Old: %s -> New: %s"), *TargetInventory->DebugName.ToString(), SlotIndex, *OldName, *NewName);
 
 	PrevInventory.Add(SlotIndex, NewItem);
 }
 
-void UPX_InventoryComponent::OnSlotRemoved(int32 SlotIndex, EPXInventorySlotTarget Target)
+//void UPX_InventoryComponent::OnSlotRemoved(int32 SlotIndex, EPXInventorySlotTarget Target)
+void UPX_InventoryComponent::OnSlotRemoved(int32 SlotIndex, FGameplayTag TargetTag)
 {
-	FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	//FPXInventorySlotArray& TargetInventory = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+	FPXInventorySlotArray* TargetInventory = FindInventoryArrayByTag(TargetTag);
+	if ( !TargetInventory ) return;
 
-	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(Target);
+	TMap<int32, TObjectPtr<UPX_ItemInstance>>& PrevInventory = GetPrevInventoryState(TargetTag);
 
 	UPX_ItemInstance* OldItem = PrevInventory.Contains(SlotIndex) ? PrevInventory[SlotIndex] : nullptr;
 
 	const FString OldName = OldItem ? OldItem->GetSafeName() : TEXT("None");
 
-	PX_LOG(Log, TEXT("%s[%d] Remove | Old: %s -> None"), *TargetInventory.DebugName.ToString(), SlotIndex, *OldName);
+	PX_LOG(Log, TEXT("%s[%d] Remove | Old: %s -> None"), *TargetInventory->DebugName.ToString(), SlotIndex, *OldName);
 
 	PrevInventory.Remove(SlotIndex);
 }

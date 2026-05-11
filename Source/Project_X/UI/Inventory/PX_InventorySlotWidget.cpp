@@ -5,7 +5,8 @@
 //#include "Component/Inventory/PX_InventoryComponent.h"
 #include "Component/Inventory/PX_ItemInstance.h"
 
-void UPX_InventorySlotWidget::SetSlotMeta(EPXInventorySlotTarget InTarget, int32 InSlotIndex)
+//void UPX_InventorySlotWidget::SetSlotMeta(EPXInventorySlotTarget InTarget, int32 InSlotIndex)
+void UPX_InventorySlotWidget::SetSlotMeta(FGameplayTag InTarget, int32 InSlotIndex)
 {
     Target = InTarget;
     SlotIndex = InSlotIndex;

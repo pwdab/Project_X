@@ -11,10 +11,8 @@ void UPX_WeaponItemInstance::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(UPX_WeaponItemInstance, AmmoInMag);
-    DOREPLIFETIME(UPX_WeaponItemInstance, AttackMode);
+    DOREPLIFETIME(UPX_WeaponItemInstance, AttackModeTag);
     DOREPLIFETIME(UPX_WeaponItemInstance, Durability);
 }
-
-
 
 

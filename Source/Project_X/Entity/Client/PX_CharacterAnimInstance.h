@@ -23,7 +23,13 @@ public:
 	void SetIsJumping(bool Value);
 
 	UFUNCTION(BlueprintCallable, Category = "Aim")
+	void SetIsFalling(bool Value);
+
+	UFUNCTION(BlueprintCallable, Category = "Aim")
 	void SetIsCrouching(bool Value);
+
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	void SetHasEquippedWeapon(bool Value);
 
     UFUNCTION(BlueprintCallable, Category = "Aim")
 	void SetIsAiming(bool Value);
@@ -73,6 +79,9 @@ private:
 	/** Is Character Crouching **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
 	bool bIsCrouching = false;
+	/** Is Character Equipped With Non-BareHand Weapon **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bHasEquippedWeapon = false;
 
 	// --- Aiming -----------------------------------------------------
 	/** Is Character Aiming **/
@@ -105,6 +114,7 @@ public:
 	FORCEINLINE const bool GetIsDrawing() { return bIsDrawing; }
 	FORCEINLINE const float GetDrawProgress() { return DrawProgress; }
 	FORCEINLINE const bool GetIsReloading() { return bIsReloading; }
+	FORCEINLINE const bool GetHasEquippedWeapon() { return bHasEquippedWeapon; }
 	FORCEINLINE const float GetAimYaw() { return AimYaw; }
 	FORCEINLINE const float GetAimPitch() { return AimPitch; }
 };

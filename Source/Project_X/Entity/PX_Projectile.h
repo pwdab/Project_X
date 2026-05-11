@@ -9,6 +9,7 @@
 class USphereComponent;
 class UProjectileMovementComponent;
 class UPX_WeaponComponent;					// Debug Camera
+class UGameplayEffect;
 
 UCLASS()
 class PROJECT_X_API APX_Projectile : public AActor
@@ -69,9 +70,23 @@ private:
 
 	void DisableProjectile();
 
+	bool ApplyDamageGameplayEffect(AActor* TargetActor);
+	void ApplyStatusGameplayEffects(AActor* TargetActor);
+
 public:
 	FORCEINLINE USphereComponent* GetSphereCollision() const { return SphereCollision; }
 	FORCEINLINE UStaticMeshComponent* GetMesh() const { return Mesh; }
 	FORCEINLINE UProjectileMovementComponent* GetProjectileMovement() const { return ProjectileMovement; }
+	void SetStatusGameplayEffectClasses(const TArray<TSubclassOf<UGameplayEffect>>& InStatusGameplayEffectClasses);
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile|Damage")
+	float DamageAmount = 20.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile|Damage")
+	TSubclassOf<UGameplayEffect> DamageGameplayEffectClass;
+
+	UPROPERTY(Transient)
+	TArray<TSubclassOf<UGameplayEffect>> StatusGameplayEffectClasses;
 
 };

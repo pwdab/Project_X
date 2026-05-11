@@ -5,6 +5,13 @@
 #include "UI/Inventory/PX_InventoryItemSlotsWidget.h"
 #include "UI/Inventory/PX_InventoryWeaponSlotsWidget.h"
 #include "Component/Inventory/PX_InventoryComponent.h"
+#include "Component/Inventory/PX_ItemInstance.h"
+
+namespace
+{
+    constexpr int32 PX_InventoryDeferredRefreshMaxAttempts = 10;
+    constexpr float PX_InventoryDeferredRefreshInterval = 0.1f;
+}
 
 void UPX_InventoryWidget::NativeOnInitialized()
 {
@@ -15,6 +22,11 @@ void UPX_InventoryWidget::NativeOnInitialized()
 
 void UPX_InventoryWidget::NativeDestruct()
 {
+    if ( UWorld* World = GetWorld() )
+    {
+        World->GetTimerManager().ClearTimer(DeferredRefreshTimerHandle);
+    }
+
     UnbindInventory();
 
     Super::NativeDestruct();
@@ -52,6 +64,11 @@ void UPX_InventoryWidget::BindInventory(UPX_InventoryComponent* InInventory)
 
 void UPX_InventoryWidget::UnbindInventory()
 {
+    if ( UWorld* World = GetWorld() )
+    {
+        World->GetTimerManager().ClearTimer(DeferredRefreshTimerHandle);
+    }
+
     if ( Inventory && bInventoryBounded )
     {
         // 델리게이트 해제
@@ -62,6 +79,7 @@ void UPX_InventoryWidget::UnbindInventory()
 
     Inventory = nullptr;
     bInventoryBounded = false;
+    DeferredRefreshAttemptCount = 0;
 }
 
 void UPX_InventoryWidget::RefreshInventory()
@@ -89,25 +107,108 @@ void UPX_InventoryWidget::HandleInventoryReady()
     if ( !Inventory || !Inventory->IsInventoryReady() ) return;
 
     RefreshInventory();
+    RequestDeferredRefresh();
 }
 
-void UPX_InventoryWidget::HandleSlotUpdated(EPXInventorySlotTarget Target, int32 SlotIndex, const FPXInventorySlot& InventorySlot)
+//void UPX_InventoryWidget::HandleSlotUpdated(EPXInventorySlotTarget Target, int32 SlotIndex, const FPXInventorySlot& InventorySlot)
+void UPX_InventoryWidget::HandleSlotUpdated(FGameplayTag Target, int32 SlotIndex, const FPXInventorySlot& InventorySlot)
 {
     //PX_LOG(Log, TEXT(""));
-    if ( Target == EPXInventorySlotTarget::Item )
+    //if ( Target == EPXInventorySlotTarget::Item )
+    if ( Target == PX_GameplayTags::Item_Inventory_General )
     {
         if ( ItemSlotsWidget )
         {
             ItemSlotsWidget->UpdateSlot(SlotIndex, InventorySlot);
         }
     }
-    else if ( Target == EPXInventorySlotTarget::Weapon )
+    //else if ( Target == EPXInventorySlotTarget::Weapon )
+    else if ( Target == PX_GameplayTags::Item_Inventory_Weapon )
     {
         if ( WeaponSlotsWidget )
         {
             WeaponSlotsWidget->UpdateSlot(SlotIndex, InventorySlot);
         }
     }
+
+    RequestDeferredRefresh();
+}
+
+void UPX_InventoryWidget::RequestDeferredRefresh()
+{
+    if ( !Inventory || !Inventory->IsInventoryReady() )
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if ( !World )
+    {
+        RefreshInventory();
+        return;
+    }
+
+    DeferredRefreshAttemptCount = 0;
+    World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+    {
+        HandleDeferredRefresh();
+    }));
+
+    World->GetTimerManager().SetTimer(DeferredRefreshTimerHandle, this, &UPX_InventoryWidget::HandleDeferredRefresh, PX_InventoryDeferredRefreshInterval, false);
+}
+
+void UPX_InventoryWidget::HandleDeferredRefresh()
+{
+    RefreshInventory();
+
+    if ( !Inventory || !Inventory->IsInventoryReady() )
+    {
+        return;
+    }
+
+    if ( !HasPendingInventoryReplication() )
+    {
+        return;
+    }
+
+    ++DeferredRefreshAttemptCount;
+    if ( DeferredRefreshAttemptCount >= PX_InventoryDeferredRefreshMaxAttempts )
+    {
+        return;
+    }
+
+    if ( UWorld* World = GetWorld() )
+    {
+        World->GetTimerManager().SetTimer(DeferredRefreshTimerHandle, this, &UPX_InventoryWidget::HandleDeferredRefresh, PX_InventoryDeferredRefreshInterval, false);
+    }
+}
+
+bool UPX_InventoryWidget::HasPendingInventoryReplication() const
+{
+    if ( !Inventory )
+    {
+        return false;
+    }
+
+    const auto HasPendingSlot = [](const TArray<FPXInventorySlot>& Slots)
+    {
+        for ( const FPXInventorySlot& Slot : Slots )
+        {
+            if ( !Slot.ItemInstanceId.IsValid() )
+            {
+                continue;
+            }
+
+            if ( !Slot.ItemInstance || !Slot.ItemInstance->GetItemDataAsset() )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    return HasPendingSlot(Inventory->GetItemSlots()) || HasPendingSlot(Inventory->GetWeaponSlots());
 }
 
 /*

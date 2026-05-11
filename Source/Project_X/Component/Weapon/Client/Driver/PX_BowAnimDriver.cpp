@@ -87,9 +87,9 @@ void UPX_BowAnimDriver::OnTick_Implementation(float DeltaSeconds, const FPXWeapo
     if (bDrawDebug)
     {
         const float Duration = 0.f;
-        DrawDebugLine(PX_Character->GetWorld(), BowStringLoc, WeaponTarget, FColor::Red, false, Duration, 0, 0.f);
-        DrawDebugLine(PX_Character->GetWorld(), CameraLoc, CameraTarget, FColor::Cyan, false, Duration, 0, 0.f);
-        DrawDebugSphere(PX_Character->GetWorld(), CameraTarget, 4.f, 12, FColor::Cyan, false, Duration);
+        //DrawDebugLine(PX_Character->GetWorld(), BowStringLoc, WeaponTarget, FColor::Red, false, Duration, 0, 1.0f);
+        //DrawDebugLine(PX_Character->GetWorld(), CameraLoc, CameraTarget, FColor::Cyan, false, Duration, 0, 1.0f);
+        //DrawDebugSphere(PX_Character->GetWorld(), CameraTarget, 4.f, 12, FColor::Cyan, false, Duration);
     }
 }
 */

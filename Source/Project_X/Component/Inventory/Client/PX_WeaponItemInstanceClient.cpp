@@ -13,7 +13,7 @@ void UPX_WeaponItemInstance::OnRep_AmmoUpdated()
 void UPX_WeaponItemInstance::OnRep_AttackModeUpdated()
 {
 	//PX_LOG(Log, TEXT("AttackMode: %s"), WeaponAttackModeToString(AttackMode));
-	OnAttackModeUpdated.Broadcast(AttackMode);
+	OnAttackModeUpdated.Broadcast(AttackModeTag);
 }
 
 

@@ -9,7 +9,7 @@ public class Project_X : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "NetCore" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "NetCore", "GameplayAbilities", "GameplayTags", "GameplayTasks", "DeveloperSettings" });
 
         PrivateIncludePaths.AddRange(
             new string[]

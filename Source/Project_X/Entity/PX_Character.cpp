@@ -13,8 +13,22 @@
 #include "Component/PX_WeaponComponent.h"
 #include "Component/Weapon/PX_WeaponSystemComponent.h"
 #include "Component/Inventory/PX_InventoryComponent.h"
+#include "Component/Demo/PX_DemoBotComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Entity/Client/PX_CharacterAnimInstance.h"
+#include "Framework/PlayerState/PX_PlayerState.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/Component/PX_AbilitySystemComponent.h"
+#include "AbilitySystem/Attributes/PX_CombatAttributeSet.h"
+#include "AbilitySystem/Attributes/PX_MovementAttributeSet.h"
+#include "AbilitySystem/Attributes/PX_ResourceAttributeSet.h"
+#include "Input/Config/PX_InputConfigDataAsset.h"
+#include "Framework/PlayerState/PX_PlayerState.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
+#include "Component/Inventory/PX_WeaponItemInstance.h"
+#include "Component/Inventory/PX_EquippableItemDataAsset.h"
+#include "Component/UI/PX_TargetStatusComponent.h"
+
 // 크로스헤어
 #include "Blueprint/UserWidget.h"
 
@@ -64,6 +78,20 @@ APX_Character::APX_Character()
 	// Setup Inventory Component
 	InventoryComponent = CreateDefaultSubobject<UPX_InventoryComponent>(TEXT("Inventory"));
 
+	// Setup target status display data.
+	TargetStatusComponent = CreateDefaultSubobject<UPX_TargetStatusComponent>(TEXT("TargetStatus"));
+
+	CharacterAbilitySystemComponent = CreateDefaultSubobject<UPX_AbilitySystemComponent>(TEXT("CharacterAbilitySystemComponent"));
+	CharacterResourceAttributeSet = CreateDefaultSubobject<UPX_ResourceAttributeSet>(TEXT("CharacterResourceSet"));
+	CharacterCombatAttributeSet = CreateDefaultSubobject<UPX_CombatAttributeSet>(TEXT("CharacterCombatSet"));
+	CharacterMovementAttributeSet = CreateDefaultSubobject<UPX_MovementAttributeSet>(TEXT("CharacterMovementSet"));
+
+	CharacterAbilitySystemComponent->AddAttributeSetSubobject<UPX_ResourceAttributeSet>(CharacterResourceAttributeSet);
+	CharacterAbilitySystemComponent->AddAttributeSetSubobject<UPX_CombatAttributeSet>(CharacterCombatAttributeSet);
+	CharacterAbilitySystemComponent->AddAttributeSetSubobject<UPX_MovementAttributeSet>(CharacterMovementAttributeSet);
+	CharacterAbilitySystemComponent->SetIsReplicated(true);
+	CharacterAbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Full);
+
 	// Setup Input Mapping Context
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMC_Default(TEXT("/Game/Project_X/Input/PX_IMC_Default.PX_IMC_Default"));
 	if (IMC_Default.Succeeded())
@@ -71,6 +99,7 @@ APX_Character::APX_Character()
 		DefaultMappingContext = IMC_Default.Object;
 	}
 
+	/* InputConfigDataAsset로 대체
 	// Setup Move Input Action
 	static ConstructorHelpers::FObjectFinder<UInputAction> IA_Move(TEXT("/Game/Project_X/Input/Action/PX_IA_Move.PX_IA_Move"));
 	if (IA_Move.Succeeded())
@@ -175,6 +204,21 @@ APX_Character::APX_Character()
 	{
 		ToggleInventoryAction = IA_ToggleInventory.Object;
 	}
+	*/
+
+	// Setup Input Config Data Asset
+	static ConstructorHelpers::FObjectFinder<UPX_InputConfigDataAsset> InputConfig(TEXT("/Game/Project_X/Input/DA_PX_InputConfig.DA_PX_InputConfig"));
+	if ( InputConfig.Succeeded() )
+	{
+		InputConfigDataAsset = InputConfig.Object;
+	}
+	
+	// Setup Equip Slot Input Action
+	static ConstructorHelpers::FObjectFinder<UInputAction> IA_EquipSlot(TEXT("/Game/Project_X/Input/Action/PX_IA_EquipSlot.PX_IA_EquipSlot"));
+	if ( IA_EquipSlot.Succeeded() )
+	{
+		EquipSlotAction = IA_EquipSlot.Object;
+	}
 
 	// Setup AnimInstance Class
 	//static ConstructorHelpers::FClassFinder<UAnimInstance> AnimClass(TEXT("/Game/Project_X/Character/PX_Character/Animations/BP_PXCharacter.BP_PXCharacter_C"));
@@ -200,6 +244,7 @@ APX_Character::APX_Character()
 
 	// Setup Character Movement Component Properties
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
 #if !UE_SERVER
 	// Setup Timeline Component
@@ -256,6 +301,8 @@ void APX_Character::Tick(float DeltaTime)
 	{
 		Client_Tick(DeltaTime);
 	}
+
+	ApplyLocomotionSpeedMode();
 }
 
 void APX_Character::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -271,13 +318,25 @@ void APX_Character::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME_CONDITION(APX_Character, bHasMoveInput, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(APX_Character, LastMoveSpeed, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(APX_Character, LastMoveDirection, COND_SkipOwner);
+	DOREPLIFETIME(APX_Character, bForceDemoAimOffset);
+	DOREPLIFETIME(APX_Character, ForcedDemoAimYaw);
+	DOREPLIFETIME(APX_Character, ForcedDemoAimPitch);
 }
 
 void APX_Character::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 
-	//WeaponSystemComponent->GetOwner() = 
+	APX_PlayerState* PX_PlayerState = GetPlayerState<APX_PlayerState>();
+	if ( !PX_PlayerState ) return;
+
+	UAbilitySystemComponent* ASC = PX_PlayerState->GetAbilitySystemComponent();
+	if ( !ASC ) return;
+
+	ASC->InitAbilityActorInfo(PX_PlayerState, this);
+	PX_PlayerState->GrantDefaultAbilities();
+
+	PX_LOG(Log, TEXT("Init AbilitySystemComponent's AbilityActorInfo"));
 }
 
 void APX_Character::MulticastPlayTurnInPlace_Implementation(bool bTurn180, bool bTurnRight)
@@ -286,8 +345,62 @@ void APX_Character::MulticastPlayTurnInPlace_Implementation(bool bTurn180, bool 
 
 	UAnimMontage* MontageToPlay = bTurn180 ? Turn180Montage : Turn90Montage;
 	if ( !MontageToPlay ) return;
+	if ( !CachedAnimInstance ) return;
 	if ( CachedAnimInstance->Montage_IsPlaying(Turn90Montage) || CachedAnimInstance->Montage_IsPlaying(Turn180Montage) ) return;
 
 	CachedAnimInstance->Montage_Play(MontageToPlay);
 	CachedAnimInstance->Montage_JumpToSection(bTurnRight ? FName("Right") : FName("Left"), MontageToPlay);
+}
+
+UAbilitySystemComponent* APX_Character::GetAbilitySystemComponent() const
+{
+	if ( const APX_PlayerState* PX_PlayerState = GetPlayerState<APX_PlayerState>() )
+	{
+		return PX_PlayerState->GetAbilitySystemComponent();
+	}
+
+	return FindComponentByClass<UPX_DemoBotComponent>() ? CharacterAbilitySystemComponent : nullptr;
+}
+
+FGameplayTag APX_Character::ResolveAttackInputTag() const
+{
+	if ( !WeaponSystemComponent )
+	{
+		PX_LOG(Warning, TEXT("WeaponSystemComponent is null"));
+		return PX_GameplayTags::Input_Combat_Attack;
+	}
+
+	UPX_WeaponItemInstance* WeaponItemInstance = WeaponSystemComponent->GetWeaponInstance();
+	if ( !WeaponItemInstance )
+	{
+		PX_LOG(Warning, TEXT("WeaponItemInstance is null"));
+		return PX_GameplayTags::Input_Combat_Attack;
+	}
+
+	UPX_EquippableItemDataAsset* EquippableItemDataAsset = WeaponItemInstance->GetEquippableItemDataAsset();
+	if ( !EquippableItemDataAsset )
+	{
+		PX_LOG(Warning, TEXT("EquippableItemDataAsset is null"));
+		return PX_GameplayTags::Input_Combat_Attack;
+	}
+
+	const FGameplayTagContainer& GrantedTags = EquippableItemDataAsset->GrantedTags;
+
+	if ( GrantedTags.HasTag(PX_GameplayTags::Weapon_Type_Gun) )
+	{
+		return PX_GameplayTags::Input_Combat_Attack_Gun;
+	}
+
+	if ( GrantedTags.HasTag(PX_GameplayTags::Weapon_Type_Bow) )
+	{
+		return PX_GameplayTags::Input_Combat_Attack_Bow;
+	}
+
+	// 필요하면 추가
+	// if ( GrantedTags.HasTag(PX_GameplayTags::Weapon_Type_Melee) )
+	// {
+	//     return PX_GameplayTags::Input_Combat_Attack_Melee;
+	// }
+
+	return PX_GameplayTags::Input_Combat_Attack;
 }

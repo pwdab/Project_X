@@ -4,13 +4,19 @@
 #include "Entity/PX_Projectile.h"
 #include "Engine/StaticMesh.h"
 #include "Components/SphereComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"							// Debug Camera
 #include "GameFramework/SpringArmComponent.h"				// Debug Camera
 #include "Component/PX_WeaponComponent.h"
 #include "Entity/PX_Character.h"
-#include "Kismet/GameplayStatics.h"							// ApplyDamage
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/Component/PX_AbilitySystemComponent.h"
+#include "AbilitySystem/Effects/PX_GE_Damage.h"
+#include "AbilitySystem/Effects/PX_GE_StatusEffects.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 #include "Net/UnrealNetwork.h"								// Replication
 
 // Sets default values
@@ -68,7 +74,9 @@ APX_Projectile::APX_Projectile()
 	FollowCamera->bUsePawnControlRotation = false;
 
 	bReplicates = true;
-	//SetReplicateMovement(true);
+	SetReplicateMovement(true);
+	InitialLifeSpan = 10.0f;
+	DamageGameplayEffectClass = UPX_GE_Damage::StaticClass();
 }
 
 void APX_Projectile::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const
@@ -116,25 +124,22 @@ void APX_Projectile::Tick(float DeltaTime)
 void APX_Projectile::OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	if (!HasAuthority()) return;
+	if ( bDisableProjectile ) return;
+	if ( !OtherActor || OtherActor == GetOwner() || OtherActor == this ) return;
 	//UE_LOG(LogTemp, Log, TEXT("Projectile On Hit"));
 
 	bDisableProjectile = true;
 	DisableProjectile();					// Disable Collision at Server
 
-	UGameplayStatics::ApplyDamage(
-		OtherActor,						// Actor that will be damaged
-		20.0f,							// The base damage to apply
-		GetInstigatorController(),		// Controller that was responsible for causing this damage
-		this,							// Actor that actually caused the damage
-		UDamageType::StaticClass()		// Class that describes the damage that was done
-	);
+	const bool bAppliedDamage = ApplyDamageGameplayEffect(OtherActor);
+	ApplyStatusGameplayEffects(OtherActor);
 
 	//AttachToComponent(OtherComp, FAttachmentTransformRules::KeepWorldTransform);
 
 	if (USkeletalMeshComponent* SkeletalMesh = Cast<USkeletalMeshComponent>(OtherComp))
 	{
-		AttachToComponent(SkeletalMesh, FAttachmentTransformRules::KeepWorldTransform, Hit.BoneName);
-		UE_LOG(LogTemp, Log, TEXT("%s gives %f damage to %s at %s"), *this->GetName(), 20.0f, *OtherActor->GetName(), *Hit.BoneName.ToString());
+		//AttachToComponent(SkeletalMesh, FAttachmentTransformRules::KeepWorldTransform, Hit.BoneName);
+		UE_LOG(LogTemp, Log, TEXT("%s applies %s damage GE (%f) to %s at %s"), *this->GetName(), bAppliedDamage ? TEXT("valid") : TEXT("invalid"), DamageAmount, *OtherActor->GetName(), *Hit.BoneName.ToString());
 	}
 	else if (OtherComp)
 	{
@@ -143,7 +148,10 @@ void APX_Projectile::OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor
 	}
 
 	// (옵션) 5초 뒤 제거
-	//SetLifeSpan(10.f);
+	if ( APX_Character* PX_Character = Cast<APX_Character>(OtherActor) )
+	{
+		SetLifeSpan(0.1f);
+	}
 
 	/*
 	* Blend Time이 끝나기 전에 PX_Character로 돌아가야 하는 상황에는 CurrentViewTarget이 PX_Character에서 Projectile로 아직 변하지 않았으므로
@@ -166,6 +174,107 @@ void APX_Projectile::OnHit(UPrimitiveComponent* Hitcomponent, AActor* OtherActor
 
 	// 서버가 받은 클라이언트 조준의 충돌 지점 (빨간 구)
 	//DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 4.0f, 16, FColor::Red, false, 2.f);
+}
+
+bool APX_Projectile::ApplyDamageGameplayEffect(AActor* TargetActor)
+{
+	if ( !HasAuthority() || !TargetActor || DamageAmount <= 0.f || !DamageGameplayEffectClass )
+	{
+		return false;
+	}
+
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
+	if ( !TargetASC )
+	{
+		return false;
+	}
+
+	AActor* SourceActor = GetInstigator() ? Cast<AActor>(GetInstigator()) : GetOwner();
+	UAbilitySystemComponent* SourceASC = SourceActor ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(SourceActor) : nullptr;
+	if ( !SourceASC )
+	{
+		SourceASC = TargetASC;
+	}
+
+	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
+	EffectContext.AddInstigator(GetInstigator(), this);
+	EffectContext.AddSourceObject(this);
+
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageGameplayEffectClass, 1.0f, EffectContext);
+	if ( !SpecHandle.IsValid() || !SpecHandle.Data.IsValid() )
+	{
+		return false;
+	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(UPX_GE_Damage::DamageSetByCallerName, DamageAmount);
+	const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+	return AppliedHandle.WasSuccessfullyApplied();
+}
+
+void APX_Projectile::ApplyStatusGameplayEffects(AActor* TargetActor)
+{
+	if ( !HasAuthority() || !TargetActor || StatusGameplayEffectClasses.IsEmpty() )
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
+	if ( !TargetASC )
+	{
+		return;
+	}
+
+	AActor* SourceActor = GetInstigator() ? Cast<AActor>(GetInstigator()) : GetOwner();
+	UAbilitySystemComponent* SourceASC = SourceActor ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(SourceActor) : nullptr;
+	if ( !SourceASC )
+	{
+		SourceASC = TargetASC;
+	}
+
+	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
+	EffectContext.AddInstigator(GetInstigator(), this);
+	EffectContext.AddSourceObject(this);
+
+	for ( TSubclassOf<UGameplayEffect> EffectClass : StatusGameplayEffectClasses )
+	{
+		if ( !EffectClass )
+		{
+			continue;
+		}
+
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(EffectClass, 1.0f, EffectContext);
+		if ( SpecHandle.IsValid() && SpecHandle.Data.IsValid() )
+		{
+			if ( EffectClass->IsChildOf(UPX_GE_BurningDamage::StaticClass()) )
+			{
+				SpecHandle.Data->DynamicGrantedTags.AddTag(PX_GameplayTags::State_Condition_Burning);
+			}
+			else if ( EffectClass->IsChildOf(UPX_GE_SlowDebuff::StaticClass()) )
+			{
+				SpecHandle.Data->DynamicGrantedTags.AddTag(PX_GameplayTags::State_Condition_Slowed);
+			}
+			else if ( EffectClass->IsChildOf(UPX_GE_StunDebuff::StaticClass()) )
+			{
+				SpecHandle.Data->DynamicGrantedTags.AddTag(PX_GameplayTags::State_Condition_Stunned);
+			}
+
+			const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			UE_LOG(LogTemp, Log, TEXT("%s applies %s status GE %s to %s"), *GetName(), AppliedHandle.WasSuccessfullyApplied() ? TEXT("valid") : TEXT("invalid"), *GetNameSafe(EffectClass), *GetNameSafe(TargetActor));
+
+			if ( AppliedHandle.WasSuccessfullyApplied() && EffectClass->IsChildOf(UPX_GE_StunDebuff::StaticClass()) )
+			{
+				if ( UPX_AbilitySystemComponent* PX_TargetASC = Cast<UPX_AbilitySystemComponent>(TargetASC) )
+				{
+					PX_TargetASC->CancelAbilitiesBlockedByTag(PX_GameplayTags::State_Condition_Stunned);
+				}
+			}
+		}
+	}
+}
+
+void APX_Projectile::SetStatusGameplayEffectClasses(const TArray<TSubclassOf<UGameplayEffect>>& InStatusGameplayEffectClasses)
+{
+	StatusGameplayEffectClasses = InStatusGameplayEffectClasses;
 }
 
 void APX_Projectile::ClientCameraTransition_Implementation(AActor* TargetActor)

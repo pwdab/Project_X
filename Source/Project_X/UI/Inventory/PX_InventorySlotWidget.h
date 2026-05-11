@@ -3,6 +3,8 @@
 #pragma once
 
 #include "Project_X.h"
+#include "GameplayTagContainer.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 #include "Blueprint/UserWidget.h"
 #include "Component/Inventory/PX_InventoryComponent.h"
 #include "PX_InventorySlotWidget.generated.h"
@@ -21,7 +23,8 @@ class PROJECT_X_API UPX_InventorySlotWidget : public UUserWidget
 	
 public:
     UFUNCTION(BlueprintCallable, Category = "PX|Inventory|Slot")
-    void SetSlotMeta(EPXInventorySlotTarget InTarget, int32 InSlotIndex);
+    //void SetSlotMeta(EPXInventorySlotTarget InTarget, int32 InSlotIndex);
+    void SetSlotMeta(FGameplayTag InTarget, int32 InSlotIndex);
 
     UFUNCTION(BlueprintCallable, Category = "PX|Inventory|Slot")
     void UpdateFromSlot(const FPXInventorySlot& InSlot);
@@ -36,7 +39,8 @@ public:
     FORCEINLINE int32 GetSlotIndex() const { return SlotIndex; }
 
     UFUNCTION(BlueprintPure, Category = "PX|Inventory|Slot")
-    FORCEINLINE EPXInventorySlotTarget GetTarget() const { return Target; }
+    //FORCEINLINE EPXInventorySlotTarget GetTarget() const { return Target; }
+    FORCEINLINE FGameplayTag GetTarget() const { return Target; }
 
     UFUNCTION(BlueprintPure, Category = "PX|Inventory|Slot")
     FORCEINLINE UPX_ItemInstance* GetItemInstance() const { return ItemInstance; }
@@ -50,7 +54,8 @@ protected:
 
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PX|Inventory|Slot")
-    EPXInventorySlotTarget Target = EPXInventorySlotTarget::None;
+    //EPXInventorySlotTarget Target = EPXInventorySlotTarget::None;
+    FGameplayTag Target;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PX|Inventory|Slot")
     int32 SlotIndex = INDEX_NONE;

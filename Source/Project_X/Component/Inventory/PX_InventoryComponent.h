@@ -12,11 +12,13 @@ DECLARE_LOG_CATEGORY_EXTERN(PX_InventoryComponent, Log, All);
 
 DECLARE_MULTICAST_DELEGATE(FPXOnInventoryReady);
 // 어떤 슬롯 배열이 바뀌었는지 구분: Target(Weapon/Item) + SlotIndex + SlotData
-DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnInventorySlotUpdated, EPXInventorySlotTarget /*Target*/, int32 /*SlotIndex*/, const FPXInventorySlot& /*Slot*/);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnInventorySlotUpdated, FGameplayTag /*TargetTag*/, int32 /*SlotIndex*/, const FPXInventorySlot& /*Slot*/);
 //DECLARE_MULTICAST_DELEGATE_OneParam(FOnInventorySlotsReset,EPXInventorySlotTarget /*Target*/);
 
 class UPX_ItemDataAsset;
+class UPX_WeaponItemInstance;
 
+/* TargetTag로 대체
 // 아이템을 추가할 타겟 컨테이너
 UENUM(BlueprintType)
 enum class EPXInventorySlotTarget : uint8
@@ -25,6 +27,7 @@ enum class EPXInventorySlotTarget : uint8
 	Weapon,
 	Item
 };
+*/
 
 // 아이템 개별 슬롯 하나
 USTRUCT(BlueprintType)
@@ -60,8 +63,12 @@ struct FPXInventorySlotArray : public FFastArraySerializer
 	class UPX_InventoryComponent* Owner = nullptr;
 
 	// 이 배열이 어떤 Slot 배열인지
+	/* TargetTag로 대체
 	UPROPERTY(NotReplicated)
 	EPXInventorySlotTarget Target = EPXInventorySlotTarget::None;
+	*/ 
+	UPROPERTY(NotReplicated)
+	FGameplayTag TargetTag;
 
 	// Debug String
 	UPROPERTY(NotReplicated)
@@ -85,15 +92,20 @@ struct FPXInventorySlotSearchResult
 	GENERATED_BODY()
 
 public:
+	/* TargetTag로 대체
 	UPROPERTY()
 	EPXInventorySlotTarget Target = EPXInventorySlotTarget::None;
+	*/
+	UPROPERTY()
+	FGameplayTag TargetTag;
 
 	UPROPERTY()
 	int32 SlotIndex = INDEX_NONE;
 
 	bool IsValid() const
 	{
-		return Target != EPXInventorySlotTarget::None && SlotIndex != INDEX_NONE;
+		//return Target != EPXInventorySlotTarget::None && SlotIndex != INDEX_NONE;
+		return TargetTag.IsValid() && SlotIndex != INDEX_NONE;
 	}
 };
 
@@ -134,9 +146,14 @@ public:
 	void ServerDropItemData(int32 Index, FVector WorldLocation);
 
 	// --- Client Functions -----------------------------------------------------
+	/* TargetTag로 대체
 	void OnSlotUpdated(int32 SlotIndex, EPXInventorySlotTarget Target);
 	void OnSlotAdded(int32 SlotIndex, EPXInventorySlotTarget Target);
 	void OnSlotRemoved(int32 SlotIndex, EPXInventorySlotTarget Target);
+	*/
+	void OnSlotUpdated(int32 SlotIndex, FGameplayTag TargetTag);
+	void OnSlotAdded(int32 SlotIndex, FGameplayTag TargetTag);
+	void OnSlotRemoved(int32 SlotIndex, FGameplayTag TargetTag);
 
 	// --- Common Functions -----------------------------------------------------
 
@@ -144,8 +161,9 @@ public:
 	FORCEINLINE bool IsInventoryReady() const { return bInventoryReady; }
 	FORCEINLINE const TArray<FPXInventorySlot>& GetItemSlots() const { return ItemSlots.Slots; }
 	FORCEINLINE const TArray<FPXInventorySlot>& GetWeaponSlots() const { return WeaponSlots.Slots; }
-	FORCEINLINE UPX_ItemInstance* GetWeaponInstanceBySlot(int32 SlotIndex) const { return WeaponSlots.Slots.IsValidIndex(SlotIndex) ? WeaponSlots.Slots[SlotIndex].ItemInstance : nullptr; }
+	FORCEINLINE UPX_WeaponItemInstance* GetWeaponItemInstanceBySlot(int32 SlotIndex) const;
 	FORCEINLINE UPX_ItemInstance* GetItemInstanceBySlot(int32 SlotIndex) const { return ItemSlots.Slots.IsValidIndex(SlotIndex) ? ItemSlots.Slots[SlotIndex].ItemInstance : nullptr; }
+	bool AddWeaponItemFromDataToSlot(UPX_ItemDataAsset* InItemDataAsset, int32 SlotIndex);
 
 	// --- Delegate Variables -----------------------------------------------------
 	FPXOnInventoryReady OnInventoryReady;
@@ -168,15 +186,22 @@ private:
 	void OnRep_InventoryReady();
 
 	// --- Common Functions -----------------------------------------------------
-	FPXInventorySlotSearchResult FindFirstEmptySlot(EPXItemKind InKind) const;
+	// FPXInventorySlotSearchResult FindFirstEmptySlot(EPXItemKind InKind) const;
+	FPXInventorySlotSearchResult FindFirstEmptySlot(const UPX_ItemDataAsset* InItemDataAsset) const;
+	FGameplayTag ResolveSlotTargetTag(const UPX_ItemDataAsset* InItemDataAsset) const;
+	FPXInventorySlotArray* FindInventoryArrayByTag(const FGameplayTag& InTargetTag);
+	const FPXInventorySlotArray* FindInventoryArrayByTag(const FGameplayTag& InTargetTag) const;
 	//int32 FindFirstEmptyItemSlot() const;
 	//int32 FindFirstEmptyWeaponSlot() const;
-	TMap<int32, TObjectPtr<UPX_ItemInstance>>& GetPrevInventoryState(EPXInventorySlotTarget InTarget);
+	//TMap<int32, TObjectPtr<UPX_ItemInstance>>& GetPrevInventoryState(EPXInventorySlotTarget InTarget);
+	TMap<int32, TObjectPtr<UPX_ItemInstance>>& GetPrevInventoryState(const FGameplayTag& InTargetTag);
+	const FName& GetInventoryDebugName(const FGameplayTag& InTargetTag) const;
 	
 	// --- Server Functions -----------------------------------------------------
 	void InitializeTargetInventorySlots(FPXInventorySlotArray& TargetArray, int32 SlotSize);
 	bool AddToSlot(UPX_ItemInstance* NewInstance);
-	bool AddToSlotIndex(UPX_ItemInstance* NewInstance, EPXInventorySlotTarget Target, int32 InSlot);
+	//bool AddToSlotIndex(UPX_ItemInstance* NewInstance, EPXInventorySlotTarget Target, int32 InSlot);
+	bool AddToSlotIndex(UPX_ItemInstance* NewInstance, const FGameplayTag& TargetTag, int32 InSlot);
 
 	// --- Client Functions -----------------------------------------------------
 	void CreateBareHandItemInstance();
@@ -186,13 +211,13 @@ private:
 	void DropItemData(int32 Index, FVector WorldLocation);
 	
 	// --- Replicated Variables ---------------------------------------------------
-	// Weapon Inventory. Size : 5, Slot 0 is reserved for barehand Only.
-	UPROPERTY(Replicated, EditAnywhere, Category = "WeaponSystem")
+	// Weapon Inventory. Size : 5, Slot 4 is reserved for barehand Only.
+	UPROPERTY(Replicated, EditAnywhere, Category = "Inventory")
 	FPXInventorySlotArray WeaponSlots;
 	// Item Inventory. Size : 30
-	UPROPERTY(Replicated, EditAnywhere, Category = "WeaponSystem")
+	UPROPERTY(Replicated, EditAnywhere, Category = "Inventory")
 	FPXInventorySlotArray ItemSlots;
-	UPROPERTY(ReplicatedUsing = OnRep_InventoryReady, EditAnywhere, Category = "WeaponSystem")
+	UPROPERTY(ReplicatedUsing = OnRep_InventoryReady, EditAnywhere, Category = "Inventory")
 	bool bInventoryReady = false;
 
 	// --- Common Variables ---------------------------------------------------

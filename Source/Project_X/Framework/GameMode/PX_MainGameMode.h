@@ -14,7 +14,12 @@ class PROJECT_X_API APX_MainGameMode : public AGameMode
 {
 	GENERATED_BODY()
 	
+public:
 	APX_MainGameMode();
-	
-	
+
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+
+private:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PX|GameMode", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<APawn> DefaultPawnClassOverride;
 };

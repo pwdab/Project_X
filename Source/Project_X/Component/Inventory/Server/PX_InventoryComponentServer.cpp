@@ -6,6 +6,7 @@
 #include "Component/Inventory/PX_ItemInstance.h"
 #include "Component/Inventory/PX_ItemDataAsset.h"
 #include "Entity/PX_Item.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 
 bool UPX_InventoryComponent::ServerCreateBareHandItemInstance_Validate()
 {
@@ -33,7 +34,7 @@ void UPX_InventoryComponent::ServerCreateBareHandItemInstance_Implementation()
 
     bInventoryReady = true;
     OnInventoryReady.Broadcast();
-    PX_LOG(Log, TEXT("BareHand Item Instance Create Complete. Inventory Ready"));
+    //PX_LOG(Log, TEXT("BareHand Item Instance Create Complete. Inventory Ready"));
 }
 
 void UPX_InventoryComponent::InitializeTargetInventorySlots(FPXInventorySlotArray& TargetArray, int32 SlotSize)
@@ -122,6 +123,20 @@ void UPX_InventoryComponent::ServerAddItemFromData_Implementation(FPX_ItemData I
     AddToSlot(NewInstance);
 }
 
+bool UPX_InventoryComponent::AddWeaponItemFromDataToSlot(UPX_ItemDataAsset* InItemDataAsset, int32 SlotIndex)
+{
+    if ( !GetOwner() || !GetOwner()->HasAuthority() ) return false;
+    if ( !InItemDataAsset ) return false;
+    if ( !InItemDataAsset->IsWeaponItem() && !InItemDataAsset->PrefersWeaponInventory() ) return false;
+    if ( !WeaponSlots.Slots.IsValidIndex(SlotIndex) ) return false;
+    if ( !WeaponSlots.Slots[SlotIndex].IsEmpty() ) return true;
+
+    UPX_ItemInstance* NewInstance = InItemDataAsset->CreateItemInstance(this, 1);
+    if ( !NewInstance ) return false;
+
+    return AddToSlotIndex(NewInstance, PX_GameplayTags::Item_Inventory_Weapon, SlotIndex);
+}
+
 /*
 bool UPX_InventoryComponent::ServerDropItemInstance_Validate(int32 Index, FVector WorldLocation)
 {
@@ -206,24 +221,36 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
     int32 Remaining = FMath::Max(1, NewInstance->GetQuantity());
 
     // 나중에 컨테이너 추가되면 switch로 바꿔야 함
-    FPXInventorySlotArray& TargetArray = (Data->Kind == EPXItemKind::Weapon) ? WeaponSlots : ItemSlots;
-    const EPXInventorySlotTarget Target = (Data->Kind == EPXItemKind::Weapon) ? EPXInventorySlotTarget::Weapon : EPXInventorySlotTarget::Item;
+    //FPXInventorySlotArray& TargetArray = (Data->Kind == EPXItemKind::Weapon) ? WeaponSlots : ItemSlots;
+    //const EPXInventorySlotTarget Target = (Data->Kind == EPXItemKind::Weapon) ? EPXInventorySlotTarget::Weapon : EPXInventorySlotTarget::Item;
+    PX_LOG(Log, TEXT(""));
+    const FGameplayTag PrimaryTargetTag = ResolveSlotTargetTag(Data);
+    PX_LOG(Log, TEXT(""));
+    FPXInventorySlotArray* TargetArray = FindInventoryArrayByTag(PrimaryTargetTag);
+    PX_LOG(Log, TEXT(""));
+    if ( !TargetArray ) return false;
 
     // 스택 불가능이면 항상 새 인스턴스를 빈 슬롯에 추가
     if ( !bStackable )
     {
+        /*
         FPXInventorySlotSearchResult EmptySlot = FindFirstEmptySlot(Data->Kind);
         if ( !EmptySlot.IsValid() ) return false;
 
         return AddToSlotIndex(NewInstance, EmptySlot.Target, EmptySlot.SlotIndex);
+        */
+        FPXInventorySlotSearchResult EmptySlot = FindFirstEmptySlot(Data);
+        if ( !EmptySlot.IsValid() ) return false;
+
+        return AddToSlotIndex(NewInstance, EmptySlot.TargetTag, EmptySlot.SlotIndex);
     }
 
     // 스택 가능이면 기존 아이템의 스택 채우고, 남으면 새 인스턴스 생성
     // 기존 스택 채우기. 나중에 Hash로 바꿔야 함.
     const int32 MaxStack = FMath::Max(1, Data->MaxStack);
-    for ( int32 i = 0; i < TargetArray.Slots.Num() && Remaining > 0; ++i )
+    for ( int32 i = 0; i < TargetArray->Slots.Num() && Remaining > 0; ++i )
     {
-        FPXInventorySlot& Slot = TargetArray.Slots[i];
+        FPXInventorySlot& Slot = TargetArray->Slots[i];
         UPX_ItemInstance* Existing = Slot.ItemInstance;
         if ( !Existing ) continue;
 
@@ -238,7 +265,11 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
         Existing->SetQuantity(CurrentQuantity + AddNow);
         Remaining -= AddNow;
 
-        TargetArray.MarkItemDirty(Slot);
+        TargetArray->MarkItemDirty(Slot);
+        if ( AActor* OwnerActor = GetOwner() )
+        {
+            OwnerActor->ForceNetUpdate();
+        }
     }
 
     // 남은 수량이 없으면 종료
@@ -246,13 +277,13 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
 
     // 기존 스택을 모두 채우고도 남은 첫 스택은 기존 Instance를 재사용
     {
-        FPXInventorySlotSearchResult Empty = FindFirstEmptySlot(Data->Kind);
+        FPXInventorySlotSearchResult Empty = FindFirstEmptySlot(Data);
         if ( !Empty.IsValid() ) return false;
 
         const int32 FirstQty = FMath::Min(MaxStack, Remaining);
         NewInstance->SetQuantity(FirstQty);
 
-        if ( !AddToSlotIndex(NewInstance, Empty.Target, Empty.SlotIndex) ) return false;
+        if ( !AddToSlotIndex(NewInstance, Empty.TargetTag, Empty.SlotIndex) ) return false;
 
         Remaining -= FirstQty;
     }
@@ -260,7 +291,7 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
     // 그래도 수량이 남았으면 새로운 인스턴스를 생성
     while ( Remaining > 0 )
     {
-        FPXInventorySlotSearchResult Empty = FindFirstEmptySlot(Data->Kind);
+        FPXInventorySlotSearchResult Empty = FindFirstEmptySlot(Data);
         if ( !Empty.IsValid() ) return false;
 
         const int32 MakeQuantity = FMath::Min(MaxStack, Remaining);
@@ -268,7 +299,7 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
         UPX_ItemInstance* NewItemInstance = Data->CreateItemInstance(this, MakeQuantity);
         if ( !NewItemInstance ) return false;
 
-        if ( !AddToSlotIndex(NewItemInstance, Empty.Target, Empty.SlotIndex) ) return false;
+        if ( !AddToSlotIndex(NewItemInstance, Empty.TargetTag, Empty.SlotIndex) ) return false;
 
         Remaining -= MakeQuantity;
     }
@@ -276,7 +307,8 @@ bool UPX_InventoryComponent::AddToSlot(UPX_ItemInstance* NewInstance)
     return true;
 }
 
-bool UPX_InventoryComponent::AddToSlotIndex(UPX_ItemInstance* NewInstance, EPXInventorySlotTarget Target,int32 InSlot)
+//bool UPX_InventoryComponent::AddToSlotIndex(UPX_ItemInstance* NewInstance, EPXInventorySlotTarget Target,int32 InSlot)
+bool UPX_InventoryComponent::AddToSlotIndex(UPX_ItemInstance* NewInstance, const FGameplayTag& TargetTag, int32 InSlot)
 {
     //PX_LOG(Log, TEXT(""));
     if ( !GetOwner() || !GetOwner()->HasAuthority() ) return false;
@@ -284,18 +316,24 @@ bool UPX_InventoryComponent::AddToSlotIndex(UPX_ItemInstance* NewInstance, EPXIn
     if ( InSlot == INDEX_NONE ) return false;
 
     // 나중에 컨테이너 추가되면 switch로 바꿔야 함
-    FPXInventorySlotArray& TargetArray = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+    //FPXInventorySlotArray& TargetArray = (Target == EPXInventorySlotTarget::Weapon) ? WeaponSlots : ItemSlots;
+    FPXInventorySlotArray* TargetArray = FindInventoryArrayByTag(TargetTag);
+    if ( !TargetArray ) return false;
 
-    if ( !TargetArray.Slots.IsValidIndex(InSlot) ) return false;
-    if ( !TargetArray.Slots[InSlot].IsEmpty() ) return false;
+    if ( !TargetArray->Slots.IsValidIndex(InSlot) ) return false;
+    if ( !TargetArray->Slots[InSlot].IsEmpty() ) return false;
 
     //const bool bIsWeapon = (NewInstance->GetItemDataAsset()->Kind == EPXItemKind::Weapon);
-    //PX_LOG(Log, TEXT("Add to %sSlots[%d]"), (Target == EPXInventorySlotTarget::Weapon) ? TEXT("Weapon") : TEXT("Item"), InSlot);
+    PX_LOG(Log, TEXT("Add to %sSlots[%d]"), *TargetTag.ToString(), InSlot);
 
-    TargetArray.Slots[InSlot].SlotIndex = InSlot;
-    TargetArray.Slots[InSlot].ItemInstance = NewInstance;
-    TargetArray.Slots[InSlot].ItemInstanceId = NewInstance->GetInstanceId();
-    TargetArray.MarkItemDirty(TargetArray.Slots[InSlot]);
+    TargetArray->Slots[InSlot].SlotIndex = InSlot;
+    TargetArray->Slots[InSlot].ItemInstance = NewInstance;
+    TargetArray->Slots[InSlot].ItemInstanceId = NewInstance->GetInstanceId();
+    TargetArray->MarkItemDirty(TargetArray->Slots[InSlot]);
+    if ( AActor* OwnerActor = GetOwner() )
+    {
+        OwnerActor->ForceNetUpdate();
+    }
 
     return true;
 }

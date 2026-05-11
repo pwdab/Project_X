@@ -7,6 +7,8 @@
 #include "Component/Weapon/PX_WeaponDataAsset.h"
 #include "PX_ItemInstance.h"
 #include "PX_ItemDataAsset.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
+#include "Component/Inventory/PX_WeaponItemInstance.h"
 
 DEFINE_LOG_CATEGORY(PX_InventoryComponent);
 
@@ -39,7 +41,7 @@ UPX_InventoryComponent::UPX_InventoryComponent()
 	}
 	*/
 
-	static ConstructorHelpers::FObjectFinder<UPX_ItemDataAsset> BardHand(TEXT("/Game/Project_X/Character/Weapon/BareHand/Data/DA_PX_ItemData_BareHand.DA_PX_ItemData_BareHand"));
+	static ConstructorHelpers::FObjectFinder<UPX_ItemDataAsset> BardHand(TEXT("/Game/Project_X/Character/Weapon/BareHand/Data/DA_PX_WeaponData_BareHand.DA_PX_WeaponData_BareHand"));
 	//static ConstructorHelpers::FObjectFinder<UPX_ItemDataAsset> BardHand(TEXT("/Game/Project_X/Character/Weapon/Lyra/Rifle/Data/DA_PX_ItemData_Rifle.DA_PX_ItemData_Rifle"));
 	if ( BardHand.Succeeded() )
 	{
@@ -58,15 +60,17 @@ void UPX_InventoryComponent::BeginPlay()
 	WeaponSlots.Owner = this;
 	ItemSlots.Owner = this;
 
-	WeaponSlots.Target = EPXInventorySlotTarget::Weapon;
-	ItemSlots.Target = EPXInventorySlotTarget::Item;
+	// WeaponSlots.Target = EPXInventorySlotTarget::Weapon;
+	// ItemSlots.Target = EPXInventorySlotTarget::Item;
+	WeaponSlots.TargetTag = PX_GameplayTags::Item_Inventory_Weapon;
+	ItemSlots.TargetTag = PX_GameplayTags::Item_Inventory_General;
 
 	WeaponSlots.DebugName = FName("Weapon Slot");
 	ItemSlots.DebugName = FName("Item Slot");
 
 	if ( GetOwner() && GetOwner()->HasAuthority() )
 	{
-		// WeaponSlots: 5칸 (0번 Barehand reserved)
+		// WeaponSlots: 5칸 (4번 Barehand reserved)
 		InitializeTargetInventorySlots(WeaponSlots, 5);
 
 		// ItemSlots: 30칸
@@ -128,12 +132,44 @@ bool UPX_InventoryComponent::ReplicateSubobjects(class UActorChannel* Channel, c
 	return bDirty;
 }
 
-FPXInventorySlotSearchResult UPX_InventoryComponent::FindFirstEmptySlot(EPXItemKind InKind) const
+FGameplayTag UPX_InventoryComponent::ResolveSlotTargetTag(const UPX_ItemDataAsset* InItemDataAsset) const
+{
+	if ( !InItemDataAsset )	return PX_GameplayTags::Item_Inventory_General;
+
+	if ( InItemDataAsset->IsGeneralSlotOnly() )
+	{
+		PX_LOG(Log, TEXT("General Slot Only Item: %s"), *InItemDataAsset->GetName());
+		return PX_GameplayTags::Item_Inventory_General;
+	}
+	else if ( InItemDataAsset->PrefersWeaponInventory() || InItemDataAsset->IsWeaponItem() )
+	{
+		PX_LOG(Log, TEXT("Weapon Inventory Item: %s"), *InItemDataAsset->GetName());
+		return PX_GameplayTags::Item_Inventory_Weapon;
+	}
+	else if ( InItemDataAsset->PrefersArmorInventory() || InItemDataAsset->IsArmorItem() )
+	{
+		PX_LOG(Log, TEXT("Armor Inventory Item: %s"), *InItemDataAsset->GetName());
+		return PX_GameplayTags::Item_Inventory_Armor;
+	}
+	else if ( InItemDataAsset->PrefersAccessoryInventory() || InItemDataAsset->IsAccessoryItem() )
+	{
+		PX_LOG(Log, TEXT("Accessory Inventory Item: %s"), *InItemDataAsset->GetName());
+		return PX_GameplayTags::Item_Inventory_Accessory;
+	}
+
+	PX_LOG(Log, TEXT("General Slot Only Item: %s"), *InItemDataAsset->GetName());
+
+	return PX_GameplayTags::Item_Inventory_General;
+}
+
+//FPXInventorySlotSearchResult UPX_InventoryComponent::FindFirstEmptySlot(EPXItemKind InKind) const
+FPXInventorySlotSearchResult UPX_InventoryComponent::FindFirstEmptySlot(const UPX_ItemDataAsset* InItemDataAsset) const
 {
 	FPXInventorySlotSearchResult Result;
 
-	if ( !GetOwner() || !GetOwner()->HasAuthority() ) return Result;
+	if ( !GetOwner() || !GetOwner()->HasAuthority() || !InItemDataAsset ) return Result;
 
+	/*
 	if ( InKind == EPXItemKind::Weapon )
 	{
 		for ( int32 i = 0; i < WeaponSlots.Slots.Num(); ++i )
@@ -157,6 +193,90 @@ FPXInventorySlotSearchResult UPX_InventoryComponent::FindFirstEmptySlot(EPXItemK
 		}
 	}
 	return Result;
+	*/
+
+	const FGameplayTag PrimaryTargetTag = ResolveSlotTargetTag(InItemDataAsset);
+	const auto FindEmptyInArray = [&Result](const FPXInventorySlotArray* TargetArray, const FGameplayTag& TargetTag) -> bool
+		{
+			if ( !TargetArray ) return false;
+
+			for ( int32 i = 0; i < TargetArray->Slots.Num(); ++i )
+			{
+				if ( TargetArray->Slots[i].IsEmpty() )
+				{
+					Result.TargetTag = TargetTag;
+					Result.SlotIndex = i;
+					return true;
+				}
+			}
+
+			return false;
+		};
+
+	// PrimaryTargetTag 슬롯에서 먼저 탐색
+	const FPXInventorySlotArray* PrimaryArray = FindInventoryArrayByTag(PrimaryTargetTag);
+	if ( PrimaryArray )
+	{
+		for ( int32 i = 0; i < PrimaryArray->Slots.Num(); ++i )
+		{
+			if ( PrimaryArray->Slots[i].IsEmpty() )
+			{
+				Result.TargetTag = PrimaryTargetTag;
+				Result.SlotIndex = i;
+				return Result;
+			}
+		}
+	}
+
+	// General 슬롯에서 다시 탐색
+	if ( PrimaryTargetTag != PX_GameplayTags::Item_Inventory_General )
+	{
+		const FPXInventorySlotArray* GeneralArray = FindInventoryArrayByTag(PX_GameplayTags::Item_Inventory_General);
+		if ( GeneralArray )
+		{
+			for ( int32 i = 0; i < GeneralArray->Slots.Num(); ++i )
+			{
+				if ( GeneralArray->Slots[i].IsEmpty() )
+				{
+					Result.TargetTag = PX_GameplayTags::Item_Inventory_General;
+					Result.SlotIndex = i;
+					return Result;
+				}
+			}
+		}
+	}
+
+	return Result;
+}
+
+FPXInventorySlotArray* UPX_InventoryComponent::FindInventoryArrayByTag(const FGameplayTag& InTargetTag)
+{
+	if ( InTargetTag == PX_GameplayTags::Item_Inventory_Weapon )
+	{
+		return &WeaponSlots;
+	}
+
+	if ( InTargetTag == PX_GameplayTags::Item_Inventory_General )
+	{
+		return &ItemSlots;
+	}
+
+	return nullptr;
+}
+
+const FPXInventorySlotArray* UPX_InventoryComponent::FindInventoryArrayByTag(const FGameplayTag& InTargetTag) const
+{
+	if ( InTargetTag == PX_GameplayTags::Item_Inventory_Weapon )
+	{
+		return &WeaponSlots;
+	}
+
+	if ( InTargetTag == PX_GameplayTags::Item_Inventory_General )
+	{
+		return &ItemSlots;
+	}
+
+	return nullptr;
 }
 
 /*
@@ -190,8 +310,25 @@ int32 UPX_InventoryComponent::FindFirstEmptyWeaponSlot() const
 }
 */
 
+/*
 TMap<int32, TObjectPtr<UPX_ItemInstance>>& UPX_InventoryComponent::GetPrevInventoryState(EPXInventorySlotTarget InTarget)
 {
 	// 나중에 인벤토리가 늘어나면 switch로 바꿔야 함.
 	return (InTarget == EPXInventorySlotTarget::Weapon) ? PreviousWeaponSlotState : PreviousItemSlotState;
+}
+*/
+
+TMap<int32, TObjectPtr<UPX_ItemInstance>>& UPX_InventoryComponent::GetPrevInventoryState(const FGameplayTag& InTargetTag)
+{
+	return (InTargetTag == PX_GameplayTags::Item_Inventory_Weapon) ? PreviousWeaponSlotState : PreviousItemSlotState;
+}
+
+const FName& UPX_InventoryComponent::GetInventoryDebugName(const FGameplayTag& InTargetTag) const
+{
+	return (InTargetTag == PX_GameplayTags::Item_Inventory_Weapon) ? WeaponSlots.DebugName : ItemSlots.DebugName;
+}
+
+UPX_WeaponItemInstance* UPX_InventoryComponent::GetWeaponItemInstanceBySlot(int32 SlotIndex) const
+{
+	return WeaponSlots.Slots.IsValidIndex(SlotIndex) ? Cast<UPX_WeaponItemInstance>(WeaponSlots.Slots[SlotIndex].ItemInstance) : nullptr;
 }

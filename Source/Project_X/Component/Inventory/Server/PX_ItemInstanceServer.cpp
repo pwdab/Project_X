@@ -2,7 +2,7 @@
 
 
 #include "Component/Inventory/PX_ItemInstance.h"
-#include "../PX_ItemDataAsset.h"
+#include "Component/Inventory/PX_ItemDataAsset.h"
 #include "Entity/PX_Item.h"
 
 void UPX_ItemInstance::InitializeFromData(UPX_ItemDataAsset* InDataAsset, int32 InQuantity)

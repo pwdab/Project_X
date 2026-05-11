@@ -4,6 +4,9 @@
 
 #include "Project_X.h"
 #include "GameFramework/Character.h"
+#include "GameplayTagContainer.h"
+#include "InputActionValue.h"
+#include "AbilitySystemInterface.h"
 #include "PX_Character.generated.h"
 
 class USpringArmComponent;
@@ -19,8 +22,15 @@ class FLifetimeProperty;
 //class UPX_WeaponComponent;
 class UPX_WeaponSystemComponent;
 class UPX_InventoryComponent;
+class UPX_TargetStatusComponent;
+class UPX_AbilitySystemComponent;
+class UPX_ResourceAttributeSet;
+class UPX_CombatAttributeSet;
+class UPX_MovementAttributeSet;
 struct FInputActionValue;
 struct FInputActionInstance;
+class UPX_InputConfigDataAsset;
+class UAbilitySystemComponent;
 
 UENUM(BlueprintType)
 enum class EMoveDirection : uint8
@@ -33,11 +43,12 @@ enum class EMoveDirection : uint8
 };
 ENUM_CLASS_FLAGS(EMoveDirection);
 
+/* PX_GA_Aim으로 이동
 UENUM(BlueprintType)
 enum class EAimState : uint8
 {
 	Idle = 0			UMETA(DisplayName = "Idle"),
-	Aim = 1 << 1		UMETA(DisplayName = "Aim"),
+	HipFire = 1 << 1		UMETA(DisplayName = "Aim"),
 	OTS = 1 << 2		UMETA(DisplayName = "OTS"),
 	ADS = 1 << 3		UMETA(DisplayName = "ADS"),
 };
@@ -62,7 +73,7 @@ public:
 
 		if ( Masked & 0b1000 ) return EAimState::ADS;
 		if ( Masked & 0b0100 ) return EAimState::OTS;
-		if ( Masked & 0b0010 ) return EAimState::Aim;
+		if ( Masked & 0b0010 ) return EAimState::HipFire;
 		return EAimState::Idle;
 	}
 	bool Has(EAimState State) const	{ return (curBits & static_cast<uint8>(State)) != 0; }
@@ -70,7 +81,7 @@ public:
 	// 최상위 비트(ADS = 1000b) 마스킹 체크
 	bool IsADS() const { return (curBits & 0b1000) != 0; }
 	bool IsOTS() const { return (curBits & 0b0100) != 0; }
-	bool IsAiming() const { return GetState() >= EAimState::Aim; }
+	bool IsAiming() const { return GetState() >= EAimState::HipFire; }
 	bool IsIdle() const { return curBits == 0; }
 	bool ShouldBeginAim() const {
 		//UE_LOG(LogTemp, Log, TEXT("Should Begin Aim ? prvBits is IDLE ?  %s, IsAiming() ? %s"), prvBits == 0b0000 ? TEXT("true") : TEXT("false"), IsAiming() ? TEXT("true") : TEXT("false"));
@@ -81,9 +92,10 @@ public:
 		//UE_LOG(LogTemp, Log, TEXT("Return %s"), prvBits >= 0b0010 && !IsAiming() ? TEXT("true") : TEXT("false"));
 		return prvBits >= 0b0010 && !IsAiming(); }
 };
+*/
 
 UCLASS()
-class PROJECT_X_API APX_Character : public ACharacter
+class PROJECT_X_API APX_Character : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -91,6 +103,7 @@ public:
 	APX_Character();
 
 	void SetLayerAnimInstanceByClass(TSubclassOf<UAnimInstance> InAnimInstanceClass);
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 		
 
 	// --- Tick-based Draw State ---------------------------------------------------------------
@@ -111,7 +124,7 @@ public:
 
 	/** Replicated so we can see where remote clients are looking. */
 	UPROPERTY(Replicated)
-	uint8 RemoteViewYaw;
+	uint8 RemoteViewYaw = 0;
 
 protected:
 	virtual void BeginPlay() override;
@@ -124,6 +137,8 @@ protected:
 
 #if !UE_SERVER
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	void AbilityInputPressed(FGameplayTag InputTag);
+	void AbilityInputReleased(FGameplayTag InputTag);
 
 	// --- Input Handlers -----------------------------------------------------
 	/** Move (WASD / Axis2D) */
@@ -149,8 +164,10 @@ protected:
 	/** Aim */
 	//void BeginAim(const FInputActionValue& Value);
 	//void EndAim(const FInputActionValue& Value);
+	/* PX_GA_Aim으로 이동
 	void BeginAim(const EAimState NewAimState);
 	void EndAim(const EAimState NewAimState);
+	*/
 	/** OTS (RMB) */
 	void BeginOTSAim(const FInputActionValue& Value);
 	void EndOTSAim(const FInputActionValue& Value);
@@ -167,6 +184,7 @@ protected:
 	void Reload();
 	/** Equip Slot Weapon (X, 1, 2, 3, 4) */
 	void EquipSlot(const FInputActionValue& Value);
+	void EquipSlotByIndex(int32 SlotIndex);
 	/** Switch Fire Mode (B) */
 	void SwitchFireMode();
 	/** Toggle Inventory (Tab) */
@@ -183,6 +201,8 @@ private:
 	void ServerBeginMove(const bool bMoved, const float Inspeed, const EMoveDirection InMoveDirection);
 	UFUNCTION(Reliable, Server)
 	void ServerEndMove(const bool bMoved);
+	UFUNCTION(Reliable, Server)
+	void ServerClearGameplayInputStateForUI();
 	UFUNCTION(Reliable, Server)
 	void ServerBeginJump();
 	UFUNCTION(Reliable, Server)
@@ -235,7 +255,7 @@ private:
 	bool bIsJumping = false;
 	UPROPERTY(ReplicatedUsing = OnRep_Crouch)
 	bool bIsCrouching = false;
-	UPROPERTY(ReplicatedUsing = OnRep_AimState)
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_AimState)
 	bool bIsAiming = false;
 	UPROPERTY(ReplicatedUsing = OnRep_DrawState)
 	bool bIsDrawing = false;
@@ -248,6 +268,13 @@ private:
 	/** Last Direction */
 	UPROPERTY(Replicated)
 	EMoveDirection LastMoveDirection = EMoveDirection::None;
+	UPROPERTY(Replicated)
+	bool bForceDemoAimOffset = false;
+	UPROPERTY(Replicated)
+	float ForcedDemoAimYaw = 0.0f;
+	UPROPERTY(Replicated)
+	float ForcedDemoAimPitch = 0.0f;
+	bool bGameplayInputBlockedForUI = false;
 
 	// --- OnRep Functions -----------------------------------------------------
 	UFUNCTION()
@@ -260,6 +287,7 @@ private:
 	void OnRep_DrawState();
 	UFUNCTION()
 	void OnRep_DrawProgress();
+	virtual void OnRep_PlayerState() override;
 
 	// --- Timeline Callback Functions -----------------------------------------------------
 	UFUNCTION()
@@ -269,8 +297,11 @@ public:
 	void HandleEndAim();
 	void RequestTurnInPlace(float DeltaYaw);
 	void RequestTurnEndSnap();
+	// 무기에 따라 Attack Input Tag를 수정해 반환
+	FGameplayTag ResolveAttackInputTag() const;
 
 	FORCEINLINE UInputMappingContext* GetDefaultMappingContext() { return DefaultMappingContext; }
+	/* InputConfigDataAsset로 대체
 	FORCEINLINE UInputAction* GetMoveAction() { return MoveAction; }
 	FORCEINLINE UInputAction* GetLookAction() { return LookAction; }
 	FORCEINLINE UInputAction* GetJumpAction() { return JumpAction; }
@@ -286,17 +317,46 @@ public:
 	FORCEINLINE UInputAction* GetEquipSlotAction() { return EquipSlotAction; }
 	FORCEINLINE UInputAction* GetSwitchFireModeAction() { return SwitchFireModeAction; }
 	FORCEINLINE UInputAction* GetToggleInventoryAction() { return ToggleInventoryAction; }
+	*/
+	FORCEINLINE UPX_InputConfigDataAsset* GetInputConfigDataAsset() { return InputConfigDataAsset; }
+	FORCEINLINE UInputAction* GetEquipSlotAction() { return EquipSlotAction; }
+
 	//FORCEINLINE UPX_WeaponComponent* GetWeaponComponent() { return WeaponComponent; }
 	FORCEINLINE UPX_WeaponSystemComponent* GetWeaponSystemComponent() { return WeaponSystemComponent; }
 	FORCEINLINE UPX_InventoryComponent* GetInventoryComponent() { return InventoryComponent; }
+	FORCEINLINE UPX_TargetStatusComponent* GetTargetStatusComponent() { return TargetStatusComponent; }
 	FORCEINLINE FRotator GetAimRotation() { FRotator Rot = FRotator(GetBaseAimRotation()); Rot.Yaw = FRotator::DecompressAxisFromByte(RemoteViewYaw); Rot.Pitch = FRotator::DecompressAxisFromByte(RemoteViewPitch); return Rot; }
 	FORCEINLINE UPX_CharacterAnimInstance* GetAnimInstance() { return CachedAnimInstance; }
 	FORCEINLINE UPX_CharacterLayerAnimInstance* GetLayerAnimInstance() { return CachedLayerAnimInstance; }
-	FORCEINLINE bool HasMoveInput() { return bHasMoveInput; }
+	FORCEINLINE bool HasMoveInput() const { return bHasMoveInput; }
+	FORCEINLINE bool IsGameplayInputBlockedForUI() const { return bGameplayInputBlockedForUI; }
+	FORCEINLINE bool ShouldForceDemoAimOffset() const { return bForceDemoAimOffset; }
+	FORCEINLINE float GetForcedDemoAimYaw() const { return ForcedDemoAimYaw; }
+	FORCEINLINE float GetForcedDemoAimPitch() const { return ForcedDemoAimPitch; }
 	FORCEINLINE float GetLastMoveSpeed() { return LastMoveSpeed; }
 	FORCEINLINE EMoveDirection GetLastMoveDirection() { return LastMoveDirection; }
 	FORCEINLINE TObjectPtr<class UTimelineComponent> GetAimProgressTimeline() { return AimProgressTimeline; }
-	FORCEINLINE FAimBitSetState GetAimState() { return AimState; }
+	//FORCEINLINE FAimBitSetState GetAimState() { return AimState; }
+
+	//UAbilitySystemComponent* GetAbilitySystemComponent() const;
+
+	void SetIsAiming(bool bNewIsAiming);
+	void ApplyAimCameraMode(bool bWantsADS, bool bWantsOTS);
+	void SetLocomotionJumping(bool bNewIsJumping);
+	void SetLocomotionCrouching(bool bNewIsCrouching);
+	void ApplyLocomotionSpeedMode();
+	void ClearGameplayInputStateForUI();
+	void SetGameplayInputBlockedForUI(bool bNewBlocked);
+	void SetHasEquippedWeapon(bool bNewHasEquippedWeapon);
+	void SetDemoMoveInputState(bool bMoved, float InSpeed, EMoveDirection InMoveDirection);
+	void SetDemoAimYaw(float InYaw);
+	void SetDemoAimRotation(const FRotator& InAimRotation);
+	void SetForceDemoAimOffset(bool bNewForce);
+	void ComparisonBeginMoveInput(const FVector2D& MovementVector);
+	void ComparisonEndMoveInput();
+	void ComparisonPressAbilityInput(FGameplayTag InputTag);
+	void ComparisonReleaseAbilityInput(FGameplayTag InputTag);
+	void ComparisonEquipSlot(int32 SlotIndex);
 
 private:
 	// --- Camera -------------------------------------------------------------
@@ -330,54 +390,66 @@ private:
 	UPX_CharacterLayerAnimInstance* CachedLayerAnimInstance = nullptr;
 
 	// --- Input --------------------------------------------------------------
-	/** MappingContext */
+	// MappingContext
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputMappingContext* DefaultMappingContext;
-	/** Move Input Action */
+	/* InputConfigDataAsset로 대체
+	// Move Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* MoveAction;
-	/** Look Input Action */
+	// Look Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
-	/** Jump Input Action */
+	// Jump Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* JumpAction;
-	/** Walk Input Action */
+	// Walk Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* WalkAction;
-	/** Sprint Input Action */
+	// Sprint Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SprintAction;
-	/** Crouch Input Action */
+	// Crouch Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CrouchAction;
-	/** Interact Input Action */
+	// Interact Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
-	/** Over The Shoulder Aim Input Action */
+	// Over The Shoulder Aim Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* OTSAimAction;
-	/** Aim Down Sight Input Action */
+	// Aim Down Sight Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ADSAction;
-	/** Draw Input Action */
+	// Draw Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* DrawAction;
-	/** Fire Input Action */
+	// Fire Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* FireAction;
-	/** Reload Input Action */
+	// Reload Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReloadAction;
-	/** Equip Input Action */
+	// Equip Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* EquipSlotAction;
-	/** Switch Fire Mode Input Action */
+	// Switch Fire Mode Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchFireModeAction;
-	/** Toggle Inventory Input Action */
+	// Toggle Inventory Input Action
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ToggleInventoryAction;
+	*/
+	// Input Config Data Asset
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_InputConfigDataAsset> InputConfigDataAsset;
+	// Equip Input Action (특수 InputAction으로 따로 빼둠, 슬롯마다 다르게 매핑될 수 있기 때문)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EquipSlotAction;
+	// 현재 무기의 Attack Input Tag
+	UPROPERTY(Transient)
+	FGameplayTag CachedAttackInputTag;
+
 
 	// --- Montage -----------------------------------------------------
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Montage", meta = (AllowPrivateAccess = "true"))
@@ -402,9 +474,12 @@ private:
 	/** Aim Progress Curve */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Aim, meta = (AllowPrivateAccess = "true"))
 	UCurveFloat* AimProgressCurve;
+
 	/** Aim State Bit Set */
+	/* PX_GA_Aim으로 이동
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Aim, meta = (AllowPrivateAccess = "true"))
 	FAimBitSetState AimState;
+	*/
 
 	// --- Weapon --------------------------------------------------------------
 	/** Weapon Component */
@@ -418,4 +493,21 @@ private:
 	// --- Inventory --------------------------------------------------------------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPX_InventoryComponent> InventoryComponent;
+
+	// --- UI --------------------------------------------------------------
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_TargetStatusComponent> TargetStatusComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_AbilitySystemComponent> CharacterAbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_ResourceAttributeSet> CharacterResourceAttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_CombatAttributeSet> CharacterCombatAttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPX_MovementAttributeSet> CharacterMovementAttributeSet;
+
 };

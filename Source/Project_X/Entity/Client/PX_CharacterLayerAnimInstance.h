@@ -48,6 +48,12 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "PX|Layer")
+	void SetHasEquippedWeapon(bool Value)
+	{
+		bHasEquippedWeapon = Value;
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "PX|Layer")
 	void SetRotation(float InYaw, float InPitch )
 	{
 		AimYaw = InYaw;
@@ -108,6 +114,9 @@ private:
 	/** Is Character Crouching **/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
 	bool bIsCrouching = false;
+	/** Is Character Equipped With Non-BareHand Weapon **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	bool bHasEquippedWeapon = false;
 
 	// --- Aiming -----------------------------------------------------
 	/** Character's Aiming Yaw **/

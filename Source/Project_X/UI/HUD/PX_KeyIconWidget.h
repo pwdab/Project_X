@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "PX_KeyIconWidget.generated.h"
 
+class UTextBlock;
+
 /**
  * 
  */
@@ -17,6 +19,8 @@ class PROJECT_X_API UPX_KeyIconWidget : public UUserWidget
 public:
 	// 단일 슬롯 갱신
 	void UpdateWidget(int32 InSlotIndex);
+	UFUNCTION(BlueprintCallable, Category = "Key Icon")
+	void UpdateText(const FText& InText);
 	// 단일 슬롯 초기화
 	void ClearWidget();
 	void HighlightWidget(bool bHighlighted);
@@ -30,4 +34,6 @@ protected:
 	void BP_ClearWidget();
 	
 	
+private:
+	UTextBlock* ResolveKeyTextBlock() const;
 };

@@ -1,16 +1,31 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Entity/PX_Character.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/Attributes/PX_MovementAttributeSet.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Framework/PlayerState/PX_PlayerState.h"
 
 #if !UE_SERVER
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Input/Config/PX_InputConfigDataAsset.h"
+#include "Input/Component/PX_EnhancedInputComponent.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
+#include "AbilitySystem/Attributes/PX_MovementAttributeSet.h"
+#include "AbilitySystem/Component/PX_AbilitySystemComponent.h"
+
 #include "PX_CharacterAnimInstance.h"
 #include "PX_CharacterLayerAnimInstance.h"
 #include "Components/TimelineComponent.h"
 #include "Entity/PX_Weapon.h"
 //#include "Component/PX_WeaponComponent.h"
 #include "Component/Weapon/PX_WeaponSystemComponent.h"
+#include "Component/Inventory/PX_InventoryComponent.h"
+#include "Component/Inventory/PX_WeaponItemInstance.h"
 #include "Component//Weapon/PX_WeaponDataAsset.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -19,6 +34,7 @@
 #include "GameFramework/SpringArmComponent.h"
 
 #include "Framework/Controller/PX_PlayerController.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #endif
 
 // Called when the game starts or when spawned
@@ -31,7 +47,7 @@ void APX_Character::BeginPlay()
 	CachedAnimInstance = Cast<UPX_CharacterAnimInstance>(GetMesh()->GetAnimInstance());
 
 	// Link Layered BP
-	if ( AnimInstanceLayerClass )
+	if ( CachedAnimInstance && AnimInstanceLayerClass )
 	{
 		CachedAnimInstance->LinkAnimClassLayers(AnimInstanceLayerClass);
 		CachedLayerAnimInstance = Cast<UPX_CharacterLayerAnimInstance>(CachedAnimInstance->GetLinkedAnimLayerInstanceByClass(AnimInstanceLayerClass));
@@ -69,7 +85,22 @@ void APX_Character::BeginPlay()
 	}
 	*/
 #endif
-} 
+}
+
+void APX_Character::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	APX_PlayerState* PX_PlayerState = GetPlayerState<APX_PlayerState>();
+	if ( !PX_PlayerState ) return;
+
+	UAbilitySystemComponent* ASC = PX_PlayerState->GetAbilitySystemComponent();
+	if ( !ASC ) return;
+
+	ASC->InitAbilityActorInfo(PX_PlayerState, this);
+
+	PX_LOG(Log, TEXT("Init AbilitySystemComponent's AbilityActorInfo"));
+}
 
 
 
@@ -152,12 +183,16 @@ void APX_Character::Client_Tick(float DeltaTime)
 
 void APX_Character::SetLayerAnimInstanceByClass(TSubclassOf<UAnimInstance> InAnimInstanceClass)
 {
-	if ( InAnimInstanceClass )
+	if ( InAnimInstanceClass && CachedAnimInstance )
 	{
 		//UE_LOG(LogTemp, Log, TEXT("PX_Character::Set Layer Anim Instace by Class"));
 		AnimInstanceLayerClass = InAnimInstanceClass;
 		CachedAnimInstance->LinkAnimClassLayers(AnimInstanceLayerClass);
 		CachedLayerAnimInstance = Cast<UPX_CharacterLayerAnimInstance>(CachedAnimInstance->GetLinkedAnimLayerInstanceByClass(AnimInstanceLayerClass));
+		if ( CachedLayerAnimInstance )
+		{
+			CachedLayerAnimInstance->SetHasEquippedWeapon(CachedAnimInstance->GetHasEquippedWeapon());
+		}
 	}
 }
 
@@ -177,6 +212,7 @@ void APX_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 	}
 
 	// Set up action bindings
+	/*
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		// Moving (Jog)
@@ -221,10 +257,118 @@ void APX_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		// Toggle Inventory
 		EnhancedInputComponent->BindAction(GetToggleInventoryAction(), ETriggerEvent::Started, this, &APX_Character::ToggleInventory);
 	}
+	*/
+	UPX_EnhancedInputComponent* PX_EnhancedInputComponent = Cast<UPX_EnhancedInputComponent>(PlayerInputComponent);
+
+	if ( !PX_EnhancedInputComponent || !InputConfigDataAsset ) return;
+
+	PX_LOG(Log, TEXT("Setup Native Inputs"));
+
+	// Native Input
+	PX_EnhancedInputComponent->BindNativeInputAction(InputConfigDataAsset, PX_GameplayTags::Input_Native_Move, ETriggerEvent::Triggered, this, &APX_Character::BeginMove);
+	PX_EnhancedInputComponent->BindNativeInputAction(InputConfigDataAsset, PX_GameplayTags::Input_Native_Move, ETriggerEvent::Completed, this, &APX_Character::EndMove);
+	PX_EnhancedInputComponent->BindNativeInputAction(InputConfigDataAsset, PX_GameplayTags::Input_Native_Look, ETriggerEvent::Triggered, this, &APX_Character::Look);
+	PX_EnhancedInputComponent->BindNativeInputAction(InputConfigDataAsset, PX_GameplayTags::Input_Native_ToggleInventory, ETriggerEvent::Started, this, &APX_Character::ToggleInventory);
+
+	PX_LOG(Log, TEXT("Setup Ability Inputs"));
+
+	// Ability Input
+	PX_EnhancedInputComponent->BindAbilityInputActions(InputConfigDataAsset, this, &APX_Character::AbilityInputPressed, &APX_Character::AbilityInputReleased);
+
+	PX_LOG(Log, TEXT("Setup Ability Special Inputs"));
+
+	// Special Inputs
+	PX_EnhancedInputComponent->BindAction(EquipSlotAction, ETriggerEvent::Started, this, &APX_Character::EquipSlot);
+}
+
+void APX_Character::AbilityInputPressed(FGameplayTag InputTag)
+{
+	//PX_LOG(Log, TEXT("Binded Ability Input Pressed Functions. Binded Action : %s"), *InputTag.ToString());
+	APX_PlayerState* PX_PlayerState = GetPlayerState<APX_PlayerState>();
+	if ( !PX_PlayerState )
+	{
+		PX_LOG(Warning, TEXT("Invalid PX_PlayerState"));
+		return;
+	}
+
+	UPX_AbilitySystemComponent* PX_AbilitySystemComponent = Cast<UPX_AbilitySystemComponent>(PX_PlayerState->GetAbilitySystemComponent());
+	if ( !PX_AbilitySystemComponent )
+	{
+		PX_LOG(Warning, TEXT("Invalid PX_AbilitySystemComponent"));
+		return;
+	}
+
+	// Attack 입력일 때만 현재 무기에 따라 세부 Attack 태그로 변환
+	if ( InputTag == PX_GameplayTags::Input_Combat_Attack )
+	{
+		CachedAttackInputTag = ResolveAttackInputTag();
+		InputTag = CachedAttackInputTag;
+	}
+	else if ( InputTag.MatchesTag(PX_GameplayTags::Input_Combat_Attack) )
+	{
+		CachedAttackInputTag = InputTag;
+	}
+
+	PX_LOG(Log, TEXT("Binded Ability Input Pressed Functions. Binded Action : %s"), *InputTag.ToString());
+
+	PX_AbilitySystemComponent->AbilityInputTagPressed(InputTag);
+
+	// Attack 입력이면 Aim Tag도 함께 전달
+	if ( InputTag == CachedAttackInputTag )
+	{
+		PX_AbilitySystemComponent->AbilityInputTagPressed(PX_GameplayTags::Input_Combat_Aim);
+	}
+
+	/*
+	// ADS 혹은 OTS 입력이면 Aim Tag도 함께 전달
+	if ( InputTag == PX_GameplayTags::Input_Combat_Aim_ADS || InputTag == PX_GameplayTags::Input_Combat_Aim_OTS )
+	{
+		PX_AbilitySystemComponent->AbilityInputTagPressed(PX_GameplayTags::Input_Combat_Aim);
+	}
+	*/
+}
+
+void APX_Character::AbilityInputReleased(FGameplayTag InputTag)
+{
+	//PX_LOG(Log, TEXT("Binded Ability Input Pressed Functions. Binded Action : %s"), *InputTag.ToString());
+	APX_PlayerState* PXPlayerState = GetPlayerState<APX_PlayerState>();
+	if ( !PXPlayerState ) return;
+
+	UPX_AbilitySystemComponent* PX_AbilitySystemComponent = Cast<UPX_AbilitySystemComponent>(PXPlayerState->GetAbilitySystemComponent());
+	if ( !PX_AbilitySystemComponent ) return;
+
+	// Attack 입력이면 Cached Attack Input을 사용
+	if ( InputTag == PX_GameplayTags::Input_Combat_Attack )
+	{
+		InputTag = CachedAttackInputTag;
+	}
+
+	PX_LOG(Log, TEXT("Binded Ability Input Pressed Functions. Binded Action : %s"), *InputTag.ToString());
+
+	PX_AbilitySystemComponent->AbilityInputTagReleased(InputTag);
+
+	// Attack 입력이면 Aim Tag도 함께 Release
+	if ( InputTag == CachedAttackInputTag )
+	{
+		PX_AbilitySystemComponent->AbilityInputTagReleased(PX_GameplayTags::Input_Combat_Aim);
+	}
+
+	/*
+	// ADS 혹은 OTS 입력이면 Aim Tag도 함께 Release
+	if ( InputTag == PX_GameplayTags::Input_Combat_Aim_ADS || InputTag == PX_GameplayTags::Input_Combat_Aim_OTS )
+	{
+		PX_AbilitySystemComponent->AbilityInputTagReleased(PX_GameplayTags::Input_Combat_Aim);
+	}
+	*/
 }
 
 void APX_Character::BeginMove(const FInputActionValue& Value)
 {
+	if ( bGameplayInputBlockedForUI )
+	{
+		return;
+	}
+
 	// input is a Vector2D
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
@@ -329,6 +473,8 @@ void APX_Character::RequestTurnEndSnap()
 
 void APX_Character::BeginJump()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	if ( !bIsJumping && !GetMovementComponent()->IsFalling() )
@@ -341,10 +487,13 @@ void APX_Character::BeginJump()
 
 		ServerBeginJump();
 	}
+	*/
 }
 
 void APX_Character::EndJump()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	if ( bIsJumping || GetMovementComponent()->IsFalling() )
@@ -357,50 +506,65 @@ void APX_Character::EndJump()
 
 		ServerEndJump();
 	}
+	*/
 }
 
 void APX_Character::BeginWalk()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	//UE_LOG(LogTemp, Log, TEXT("Client Begin Walk"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	GetCharacterMovement()->MaxWalkSpeed = 300.0f;
 	ServerBeginWalk();
+	*/
 }
 
 void APX_Character::EndWalk()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	//UE_LOG(LogTemp, Log, TEXT("Client End Walk"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
 	ServerEndWalk();
+	*/
 }
 
 void APX_Character::BeginSprint()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	//UE_LOG(LogTemp, Log, TEXT("Client Begin Sprint"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	GetCharacterMovement()->MaxWalkSpeed = 900.0f;
 	ServerBeginSprint();
+	*/
 }
 
 void APX_Character::EndSprint()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	//UE_LOG(LogTemp, Log, TEXT("Client End Sprint"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
 	ServerEndSprint();
+	*/
 }
 
 void APX_Character::BeginCrouch()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Client Begin Crouch: bIsCrouching is %s"), bIsCrouching ? TEXT("true") : TEXT("false"));
@@ -415,10 +579,13 @@ void APX_Character::BeginCrouch()
 		GetCharacterMovement()->MaxWalkSpeed = 300.0f;
 		ServerBeginCrouch();
 	}
+	*/
 }
 
 void APX_Character::EndCrouch()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Client End Crouch: bIsCrouching is %s"), bIsCrouching ? TEXT("true") : TEXT("false"));
@@ -433,6 +600,7 @@ void APX_Character::EndCrouch()
 		GetCharacterMovement()->MaxWalkSpeed = 600.0f;
 		ServerEndCrouch();
 	}
+	*/
 }
 
 void APX_Character::Interact()
@@ -440,34 +608,35 @@ void APX_Character::Interact()
 	UE_LOG(LogTemp, Log, TEXT("Client Interact"));
 }
 
+/*
 void APX_Character::BeginAim(const EAimState NewAimState)
 {
 	//UE_LOG(LogTemp, Log, TEXT("Client Begin Aim"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	/*
-	if ( !bIsAiming )
-	{
-		if ( bHasMoveInput )
-		{
-			bUseControllerRotationYaw = true;
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-		}
+	//
+	//if ( !bIsAiming )
+	//{
+		//if ( bHasMoveInput )
+		//{
+			//bUseControllerRotationYaw = true;
+//			GetCharacterMovement()->bOrientRotationToMovement = false;
+		//}
 
-		if ( CachedAnimInstance )
-		{
-			CachedAnimInstance->SetIsAiming(Value.Get<bool>());
-		}
+		//if ( CachedAnimInstance )
+		//{
+//			CachedAnimInstance->SetIsAiming(Value.Get<bool>());
+		//}
 
-		if ( AimProgressTimeline )
-		{
-			AimProgressTimeline->PlayFromStart();
-		}
-
-		ServerBeginAim(Value.Get<bool>());
-	}
-	*/
+		//if ( AimProgressTimeline )
+		//{
+		//	AimProgressTimeline->PlayFromStart();
+	//	}
+//
+	//	ServerBeginAim(Value.Get<bool>());
+	//}
+	//
 
 	if ( !WeaponSystemComponent ) return;
 
@@ -477,7 +646,7 @@ void APX_Character::BeginAim(const EAimState NewAimState)
 
 	if ( AimState.ShouldBeginAim() )
 	{
-		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::Aim_On));
+		//WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::Aim_On));
 	}
 
 
@@ -487,38 +656,40 @@ void APX_Character::BeginAim(const EAimState NewAimState)
 
 	ServerBeginAim(true);
 }
+*/
 
+/*
 void APX_Character::EndAim(const EAimState NewAimState)
 {
 	//UE_LOG(LogTemp, Log, TEXT("Client OTS Aim"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	/*
-	if ( bIsAiming )
-	{
-		bUseControllerRotationYaw = false;
-		GetCharacterMovement()->bOrientRotationToMovement = true;
+	//
+	//if ( bIsAiming )
+	//{
+	//	bUseControllerRotationYaw = false;
+	//	GetCharacterMovement()->bOrientRotationToMovement = true;
 
-		if ( CachedAnimInstance )
-		{
-			CachedAnimInstance->SetIsAiming(Value.Get<bool>());
-		}
+//		if ( CachedAnimInstance )
+	//	{
+	//		CachedAnimInstance->SetIsAiming(Value.Get<bool>());
+	//	}
 
-		if ( AimProgressTimeline )
-		{
-			AimProgressTimeline->Reverse();
-		}
+	//	if ( AimProgressTimeline )
+	//	{
+	//		AimProgressTimeline->Reverse();
+	//	}
 
-		if ( bIsDrawing )
-		{
-			CachedAnimInstance->SetIsDrawing(Value.Get<bool>());
-			CachedAnimInstance->SetDrawProgress(0.f);
-		}
+	//	if ( bIsDrawing )
+	//	{
+	//		CachedAnimInstance->SetIsDrawing(Value.Get<bool>());
+	//		CachedAnimInstance->SetDrawProgress(0.f);
+	//	}
 
-		ServerEndAim(Value.Get<bool>());
-	}
-	*/
+	//	ServerEndAim(Value.Get<bool>());
+	//}
+	
 	if ( !WeaponSystemComponent ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("PX_Character Client End Aim"));
@@ -527,7 +698,7 @@ void APX_Character::EndAim(const EAimState NewAimState)
 
 	if ( AimState.ShouldEndAim() )
 	{
-		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::Aim_Off));
+		//WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::Aim_Off));
 
 		bUseControllerRotationYaw = false;
 		GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -537,6 +708,7 @@ void APX_Character::EndAim(const EAimState NewAimState)
 
 	
 }
+*/
 
 void APX_Character::HandleEndAim()
 {
@@ -557,7 +729,7 @@ void APX_Character::BeginOTSAim(const FInputActionValue& Value)
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	BeginAim(EAimState::OTS);
+	//BeginAim(EAimState::OTS);
 
 	// Move Camera to OTS Aim Position
 	CameraBoom->TargetArmLength = 90.0f;
@@ -565,7 +737,6 @@ void APX_Character::BeginOTSAim(const FInputActionValue& Value)
 
 	ServerBeginAim(true);
 
-	/*
 	if ( !bIsAiming )
 	{
 		if ( CachedAnimInstance )
@@ -586,22 +757,20 @@ void APX_Character::BeginOTSAim(const FInputActionValue& Value)
 		//ServerBeginOTSAim(Value.Get<bool>());
 		ServerBeginAim(Value.Get<bool>());
 	}
-	*/
 }
 
 void APX_Character::EndOTSAim(const FInputActionValue& Value)
 {
-	//UE_LOG(LogTemp, Log, TEXT("Client End OTS Aim"));
+	UE_LOG(LogTemp, Log, TEXT("Client End OTS Aim"));
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	EndAim(EAimState::OTS);
+	//EndAim(EAimState::OTS);
 
 	// Move Camera to Idle Position
 	CameraBoom->TargetArmLength = 250.0f;
 	FollowCamera->SetRelativeLocation(FVector(0.0f, 45.0f, 100.0f));
 
-	/*
 	if ( bIsAiming )
 	{
 		if ( CachedAnimInstance )
@@ -628,7 +797,6 @@ void APX_Character::EndOTSAim(const FInputActionValue& Value)
 		//ServerEndOTSAim(Value.Get<bool>());
 		ServerEndAim(Value.Get<bool>());
 	}
-	*/
 }
 
 void APX_Character::BeginADS(const FInputActionValue& Value)
@@ -637,7 +805,7 @@ void APX_Character::BeginADS(const FInputActionValue& Value)
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	BeginAim(EAimState::ADS);
+	//BeginAim(EAimState::ADS);
 
 	// Move Camera to ADS Position
 	CameraBoom->bDoCollisionTest = false;
@@ -680,7 +848,7 @@ void APX_Character::EndADS(const FInputActionValue& Value)
 
 	if ( HasAuthority() || !IsLocallyControlled() ) return;
 
-	EndAim(EAimState::ADS);
+	//EndAim(EAimState::ADS);
 
 	// Move Camera to Idle Position
 	FPSCamera->SetActive(false);
@@ -818,47 +986,262 @@ void APX_Character::EndDraw(const FInputActionInstance& Instance)
 }
 #endif
 
+void APX_Character::SetLocomotionJumping(bool bNewIsJumping)
+{
+	bIsJumping = bNewIsJumping;
+
+#if !UE_SERVER
+	if ( CachedAnimInstance )
+	{
+		CachedAnimInstance->SetIsJumping(bNewIsJumping);
+		if ( bNewIsJumping )
+		{
+			CachedAnimInstance->SetIsFalling(true);
+		}
+	}
+#endif
+
+	if ( bNewIsJumping )
+	{
+		Jump();
+	}
+	else
+	{
+		StopJumping();
+	}
+}
+
+void APX_Character::SetLocomotionCrouching(bool bNewIsCrouching)
+{
+	bIsCrouching = bNewIsCrouching;
+
+#if !UE_SERVER
+	if ( CachedAnimInstance )
+	{
+		CachedAnimInstance->SetIsCrouching(bNewIsCrouching);
+	}
+#endif
+
+	if ( bNewIsCrouching )
+	{
+		Crouch();
+	}
+	else
+	{
+		UnCrouch();
+	}
+
+	ApplyLocomotionSpeedMode();
+}
+
+void APX_Character::ApplyLocomotionSpeedMode()
+{
+	UCharacterMovementComponent* MovementComp = GetCharacterMovement();
+	if ( !MovementComp )
+	{
+		return;
+	}
+
+	float BaseMoveSpeed = 600.0f;
+	float SprintSpeedMultiplier = 1.5f;
+
+	if ( UAbilitySystemComponent* ASC = GetAbilitySystemComponent() )
+	{
+		BaseMoveSpeed = ASC->GetNumericAttribute(UPX_MovementAttributeSet::GetMoveSpeedAttribute());
+		SprintSpeedMultiplier = ASC->GetNumericAttribute(UPX_MovementAttributeSet::GetSprintSpeedMultiplierAttribute());
+
+		if ( ASC->HasMatchingGameplayTag(PX_GameplayTags::State_Locomotion_Crouching) )
+		{
+			MovementComp->MaxWalkSpeed = BaseMoveSpeed * 0.5f;
+			MovementComp->MaxWalkSpeedCrouched = BaseMoveSpeed * 0.5f;
+			return;
+		}
+
+		if ( ASC->HasMatchingGameplayTag(PX_GameplayTags::State_Locomotion_Sprinting) )
+		{
+			MovementComp->MaxWalkSpeed = BaseMoveSpeed * SprintSpeedMultiplier;
+			return;
+		}
+
+		if ( ASC->HasMatchingGameplayTag(PX_GameplayTags::State_Locomotion_Walking) )
+		{
+			MovementComp->MaxWalkSpeed = BaseMoveSpeed * 0.5f;
+			return;
+		}
+	}
+
+	MovementComp->MaxWalkSpeed = BaseMoveSpeed;
+	MovementComp->MaxWalkSpeedCrouched = BaseMoveSpeed * 0.5f;
+}
+
+void APX_Character::ClearGameplayInputStateForUI()
+{
+	bHasMoveInput = false;
+	LastMoveSpeed = 0.0f;
+	LastMoveDirection = EMoveDirection::None;
+	ConsumeMovementInputVector();
+
+	bUseControllerRotationYaw = false;
+	if ( UCharacterMovementComponent* MovementComp = GetCharacterMovement() )
+	{
+		MovementComp->bOrientRotationToMovement = true;
+		if ( !MovementComp->IsFalling() )
+		{
+			MovementComp->StopMovementImmediately();
+		}
+	}
+
+	SetLocomotionCrouching(false);
+	SetIsAiming(false);
+	ApplyAimCameraMode(false, false);
+	ApplyLocomotionSpeedMode();
+
+#if !UE_SERVER
+	if ( CachedAnimInstance )
+	{
+		CachedAnimInstance->SetIsAiming(false);
+		CachedAnimInstance->SetIsCrouching(false);
+	}
+#endif
+
+	if ( !HasAuthority() && IsLocallyControlled() )
+	{
+		ServerClearGameplayInputStateForUI();
+	}
+}
+
+void APX_Character::SetGameplayInputBlockedForUI(bool bNewBlocked)
+{
+	bGameplayInputBlockedForUI = bNewBlocked;
+}
+
+void APX_Character::SetHasEquippedWeapon(bool bNewHasEquippedWeapon)
+{
+#if !UE_SERVER
+	if ( CachedAnimInstance )
+	{
+		CachedAnimInstance->SetHasEquippedWeapon(bNewHasEquippedWeapon);
+	}
+#endif
+}
+
 void APX_Character::FirePressed()
 {
 	UE_LOG(LogTemp, Log, TEXT("Client Fire Pressed"));
-
+	/*
 	BeginAim(EAimState::Aim);
 
 	if (WeaponSystemComponent)
 	{
 		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::AttackPressed));
 	}
+	*/
 }
 
 void APX_Character::FireReleased()
 {
 	UE_LOG(LogTemp, Log, TEXT("Client Fire Released"));
-
+	/*
 	if ( WeaponSystemComponent )
 	{
 		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::AttackReleased));
 	}
 
 	EndAim(EAimState::Aim);
+	*/
 }
 
 void APX_Character::Reload()
 {
 	UE_LOG(LogTemp, Log, TEXT("Client Begin Reload"));
+	/*
 	if (WeaponSystemComponent)
 	{
 		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::BeginReload));
 	}
+	*/
 }
 
 void APX_Character::EquipSlot(const FInputActionValue& Value)
 {
-	UE_LOG(LogTemp, Log, TEXT("Equip Index %f Weapon"), Value.Get<float>() - 1);
-	if ( WeaponSystemComponent )
+    const int32 SlotIndex = FMath::RoundToInt(Value.Get<float>() - 1.0f);
+    UE_LOG(LogTemp, Log, TEXT("Equip Index %d Weapon"), SlotIndex);
+	EquipSlotByIndex(SlotIndex);
+}
+
+void APX_Character::EquipSlotByIndex(int32 SlotIndex)
+{
+	if ( SlotIndex == INDEX_NONE || !WeaponSystemComponent )
 	{
-		//WeaponSystemComponent->EquipWeaponBySlot(Value.Get<float>() - 1);
-		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::BeginEquip, Value.Get<float>() - 1));
+		PX_LOG(Warning, TEXT("Invalid slot index or WeaponSystemComponent is null"));
+		return;
 	}
+
+	if ( !InventoryComponent || !InventoryComponent->IsInventoryReady() )
+	{
+		PX_LOG(Warning, TEXT("Inventory is not ready"));
+		return;
+	}
+
+	UPX_WeaponItemInstance* NewWeaponItemInstance = InventoryComponent->GetWeaponItemInstanceBySlot(SlotIndex);
+	if ( !NewWeaponItemInstance )
+	{
+		PX_LOG(Warning, TEXT("No weapon item instance found in slot %d"), SlotIndex);
+		return;
+	}
+
+	FGuid NewWeaponInstanceId = NewWeaponItemInstance->GetInstanceId();
+
+	// 같은 무기 재장착 방지
+	if ( NewWeaponInstanceId == WeaponSystemComponent->GetWeaponItemInstanceId() )
+	{
+		PX_LOG(Warning, TEXT("Weapon in slot %d is already equipped"), SlotIndex);
+		return;
+	}
+
+	UPX_AbilitySystemComponent* PX_ASC = Cast<UPX_AbilitySystemComponent>(GetAbilitySystemComponent());
+	if ( !PX_ASC )
+	{
+		PX_LOG(Warning, TEXT("PX_ASC is Invalid."));
+	}
+
+	if ( !WeaponSystemComponent )
+	{
+		PX_LOG(Warning, TEXT("WeaponSystemComponent is Invalid."));
+	}
+
+	// 무기 변경 시 기존 무기의 액션이 남아있을 수 있으므로 관련 액션 태그를 가진 능력들을 취소
+	PX_LOG(Log, TEXT("Canceling abilities with tags: Ability_Weapon_Equip, Ability_Weapon_Reload, Ability_Weapon_Attack"));
+	FGameplayTagContainer CancelTags;
+	//CancelTags.AddTag(PX_GameplayTags::Ability_Weapon_Equip);	// 무기 변경은 Cancel이 아니라 Equip_Chance로 분기하도록 변경
+	CancelTags.AddTag(PX_GameplayTags::Ability_Weapon_Reload);
+	CancelTags.AddTag(PX_GameplayTags::Ability_Weapon_Attack);
+	PX_ASC->CancelAbilities(&CancelTags, nullptr, nullptr);
+
+	// Event 생성
+	FGameplayEventData EventData;
+	
+	EventData.Instigator = this;
+	EventData.Target = this;
+	EventData.EventMagnitude = static_cast<float>(SlotIndex);
+
+	if ( PX_ASC->HasMatchingGameplayTag(PX_GameplayTags::State_Combat_Equipping) )
+	{
+		PX_LOG(Log, TEXT("Equip Action is still Active.."));
+		if ( WeaponSystemComponent && WeaponSystemComponent->Local_IsEquipCancelable() )
+		{
+			PX_LOG(Log, TEXT("Change Equip Weapon"));
+			WeaponSystemComponent->Local_ChangeEquipBySlot(SlotIndex);
+			return;
+		}
+		PX_LOG(Log, TEXT("Abort input"));
+		return;
+	}
+
+	// Equip 중이 아니면 Equip 시작
+	EventData.EventTag = PX_GameplayTags::Event_Weapon_Equip_Begin;
+	PX_LOG(Log, TEXT("Call Action with Event Tag: %s"), *EventData.EventTag.ToString());
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, PX_GameplayTags::Event_Weapon_Equip_Begin, EventData);
 }
 
 void APX_Character::SwitchFireMode()
@@ -870,10 +1253,12 @@ void APX_Character::SwitchFireMode()
 		Weapon->SwitchFireMode();
 	}
 	*/
+	/*
 	if ( WeaponSystemComponent )
 	{
-		WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::SetFireMode));
+		//WeaponSystemComponent->ClientSubmitAction(FPXWeaponActionContext::Builder(EPXWeaponActionType::SetFireMode));
 	}
+	*/
 }
 
 void APX_Character::ToggleInventory()
@@ -903,10 +1288,88 @@ void APX_Character::OnRep_Crouch()
 	}
 }
 
+void APX_Character::SetIsAiming(bool bNewIsAiming)
+{
+	PX_LOG(Log, TEXT(""));
+
+	bIsAiming = bNewIsAiming;
+
+	if ( AimProgressTimeline )
+	{
+		if ( bIsAiming )
+		{
+			AimProgressTimeline->PlayFromStart();
+		}
+		else
+		{
+			AimProgressTimeline->Reverse();
+		}
+	}
+}
+
+void APX_Character::ApplyAimCameraMode(bool bWantsADS, bool bWantsOTS)
+{
+	if ( !IsLocallyControlled() )
+	{
+		return;
+	}
+
+	if ( bWantsADS )
+	{
+		if ( CameraBoom )
+		{
+			CameraBoom->bDoCollisionTest = false;
+		}
+		if ( FollowCamera )
+		{
+			FollowCamera->SetActive(false);
+		}
+		if ( FPSCamera )
+		{
+			FPSCamera->SetActive(true);
+		}
+		return;
+	}
+
+	if ( FPSCamera )
+	{
+		FPSCamera->SetActive(false);
+	}
+	if ( FollowCamera )
+	{
+		FollowCamera->SetActive(true);
+	}
+	if ( CameraBoom )
+	{
+		CameraBoom->bDoCollisionTest = true;
+	}
+
+	if ( bWantsOTS )
+	{
+		if ( CameraBoom )
+		{
+			CameraBoom->TargetArmLength = 90.0f;
+		}
+		if ( FollowCamera )
+		{
+			FollowCamera->SetRelativeLocation(FVector(0.0f, 45.0f, 80.0f));
+		}
+		return;
+	}
+
+	if ( CameraBoom )
+	{
+		CameraBoom->TargetArmLength = 250.0f;
+	}
+	if ( FollowCamera )
+	{
+		FollowCamera->SetRelativeLocation(FVector(0.0f, 45.0f, 100.0f));
+	}
+}
+
 void APX_Character::OnRep_AimState()
 {
-#if !UE_SERVER
-	//UE_LOG(LogTemp, Log, TEXT("OnRep Aim.."));
+	PX_LOG(Log, TEXT(""));
 
 	if (CachedAnimInstance)
 	{
@@ -924,7 +1387,6 @@ void APX_Character::OnRep_AimState()
 			AimProgressTimeline->Reverse();
 		}
 	}
-#endif
 }
 
 void APX_Character::OnRep_DrawState()
@@ -957,6 +1419,66 @@ void APX_Character::AimProgressUpdate(float Value)
 {
 #if !UE_SERVER
 	//UE_LOG(LogTemp, Log, TEXT("AimProgressUpdate.. AimProgress : %f"), Value);
-	CachedAnimInstance->SetAimProgress(Value);
+	if ( CachedAnimInstance )
+	{
+		CachedAnimInstance->SetAimProgress(Value);
+	}
+#endif
+}
+
+void APX_Character::ComparisonBeginMoveInput(const FVector2D& MovementVector)
+{
+#if !UE_SERVER
+	if ( bGameplayInputBlockedForUI || !Controller )
+	{
+		return;
+	}
+
+	const FRotator Rotation = Controller->GetControlRotation();
+	const FRotator YawRotation(0, Rotation.Yaw + CameraOffset, 0);
+	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	AddMovementInput(ForwardDirection, MovementVector.Y);
+	AddMovementInput(RightDirection, MovementVector.X);
+
+	bHasMoveInput = !MovementVector.IsNearlyZero();
+	bUseControllerRotationYaw = bIsAiming;
+	if ( UCharacterMovementComponent* MovementComp = GetCharacterMovement() )
+	{
+		MovementComp->bOrientRotationToMovement = !bIsAiming;
+	}
+
+	LastMoveSpeed = GetVelocity().Size2D();
+	LastMoveDirection = ResolveMoveDirection(MovementVector);
+	ServerBeginMove(bHasMoveInput, LastMoveSpeed, LastMoveDirection);
+#endif
+}
+
+void APX_Character::ComparisonEndMoveInput()
+{
+#if !UE_SERVER
+	EndMove();
+#endif
+}
+
+void APX_Character::ComparisonPressAbilityInput(FGameplayTag InputTag)
+{
+#if !UE_SERVER
+	AbilityInputPressed(InputTag);
+#endif
+}
+
+void APX_Character::ComparisonReleaseAbilityInput(FGameplayTag InputTag)
+{
+#if !UE_SERVER
+	AbilityInputReleased(InputTag);
+#endif
+}
+
+void APX_Character::ComparisonEquipSlot(int32 SlotIndex)
+{
+#if !UE_SERVER
+	EquipSlotByIndex(SlotIndex);
 #endif
 }

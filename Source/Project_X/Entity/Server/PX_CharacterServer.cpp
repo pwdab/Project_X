@@ -26,6 +26,7 @@ void APX_Character::Server_Tick(float DeltaTime)
 void APX_Character::ServerPlayTurnInPlace_Implementation(bool bTurn180, bool bTurnRight)
 {
 	if ( !HasAuthority() ) return;
+	if ( !CachedAnimInstance ) return;
 	if ( CachedAnimInstance->Montage_IsPlaying(Turn90Montage) || CachedAnimInstance->Montage_IsPlaying(Turn180Montage) )	return;
 
 	//UE_LOG(LogTemp, Log, TEXT("ServerPlayTurnInPlace"));
@@ -54,78 +55,176 @@ void APX_Character::ServerEndMove_Implementation(const bool bMoved)
 	if ( !HasAuthority() ) return;
 
 	bHasMoveInput = bMoved;
+	if ( !bMoved )
+	{
+		LastMoveSpeed = 0.0f;
+		LastMoveDirection = EMoveDirection::None;
+	}
+}
+
+void APX_Character::SetDemoMoveInputState(bool bMoved, float InSpeed, EMoveDirection InMoveDirection)
+{
+	if ( !HasAuthority() ) return;
+
+	bHasMoveInput = bMoved;
+	LastMoveSpeed = bMoved ? InSpeed : 0.0f;
+	LastMoveDirection = bMoved ? InMoveDirection : EMoveDirection::None;
+}
+
+void APX_Character::SetDemoAimYaw(float InYaw)
+{
+	if ( !HasAuthority() ) return;
+
+	RemoteViewYaw = FRotator::CompressAxisToByte(InYaw);
+	bForceDemoAimOffset = false;
+	ForcedDemoAimYaw = 0.0f;
+	ForcedDemoAimPitch = 0.0f;
+}
+
+void APX_Character::SetDemoAimRotation(const FRotator& InAimRotation)
+{
+	if ( !HasAuthority() ) return;
+
+	RemoteViewYaw = FRotator::CompressAxisToByte(InAimRotation.Yaw);
+	RemoteViewPitch = FRotator::CompressAxisToByte(InAimRotation.Pitch);
+
+	const FRotator Delta = (InAimRotation - GetActorRotation()).GetNormalized();
+	bForceDemoAimOffset = true;
+	ForcedDemoAimYaw = FMath::Clamp(Delta.Yaw + 6.5f, -180.0f, 180.0f);
+	ForcedDemoAimPitch = FMath::Clamp(Delta.Pitch, -90.0f, 90.0f);
+}
+
+void APX_Character::SetForceDemoAimOffset(bool bNewForce)
+{
+	if ( !HasAuthority() ) return;
+
+	bForceDemoAimOffset = bNewForce;
+	if ( !bForceDemoAimOffset )
+	{
+		ForcedDemoAimYaw = 0.0f;
+		ForcedDemoAimPitch = 0.0f;
+	}
+}
+
+void APX_Character::ServerClearGameplayInputStateForUI_Implementation()
+{
+	if ( !HasAuthority() ) return;
+
+	bHasMoveInput = false;
+	LastMoveSpeed = 0.0f;
+	LastMoveDirection = EMoveDirection::None;
+	ConsumeMovementInputVector();
+
+	bUseControllerRotationYaw = false;
+	if ( UCharacterMovementComponent* MovementComp = GetCharacterMovement() )
+	{
+		MovementComp->bOrientRotationToMovement = true;
+		if ( !MovementComp->IsFalling() )
+		{
+			MovementComp->StopMovementImmediately();
+		}
+	}
+
+	SetLocomotionCrouching(false);
+	SetIsAiming(false);
+	ApplyAimCameraMode(false, false);
+	ApplyLocomotionSpeedMode();
 }
 
 void APX_Character::ServerBeginJump_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 	if ( bIsJumping || GetMovementComponent()->IsFalling() )	return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server Begin Jump"));
 
 	bIsJumping = true;
+	*/
 }
 
 void APX_Character::ServerEndJump_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 	if ( !bIsJumping )	return;
 
 	bIsJumping = false;
+	*/
 }
 
 void APX_Character::ServerBeginWalk_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server Begin Walk"));
 
 	GetCharacterMovement()->MaxWalkSpeed = 300.0f;
+	*/
 }
 
 void APX_Character::ServerEndWalk_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server End Walk"));
 
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	*/
 }
 
 void APX_Character::ServerBeginSprint_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server Begin Sprint"));
 
 	GetCharacterMovement()->MaxWalkSpeed = 1200.0f;
+	*/
 }
 
 void APX_Character::ServerEndSprint_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server End Sprint"));
 
 	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	*/
 }
 
 void APX_Character::ServerBeginCrouch_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 	if ( bIsCrouching )	return;
 
 	//UE_LOG(LogTemp, Log, TEXT("Server Begin Crouch"));
 
 	bIsCrouching = true;
+	*/
 }
 
 void APX_Character::ServerEndCrouch_Implementation()
 {
+	/*
+	// Deprecated: locomotion is now handled by GAS abilities.
 	if ( !HasAuthority() ) return;
 	if ( !bIsCrouching )	return;
 	//UE_LOG(LogTemp, Log, TEXT("Server End Crouch"));
 	bIsCrouching = false;
+	*/
 }
 
 bool APX_Character::ServerBeginAim_Validate(const bool bPressed)

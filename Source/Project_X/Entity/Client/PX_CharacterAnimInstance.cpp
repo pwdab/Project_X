@@ -2,6 +2,7 @@
 
 #include "Entity/Client/PX_CharacterAnimInstance.h"
 #include "Entity/Client/PX_CharacterLayerAnimInstance.h"
+#include "Component/Demo/PX_DemoBotComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 //#include "Components/CapsuleComponent.h"    // Debug Draw
 #include "Entity/PX_Character.h"
@@ -13,15 +14,15 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     if (APawn* Pawn = TryGetPawnOwner())
     {
 
-        Velocity = Pawn->GetVelocity();
-
         if ( ACharacter* Character = Cast<ACharacter>(Pawn) )
         {
             bIsFalling = Character->GetMovementComponent()->IsFalling();
 
             if ( APX_Character* PX_Character = Cast<APX_Character>(TryGetPawnOwner()) )
             {
-                bHasInput = PX_Character->HasMoveInput();
+                const bool bGameplayInputBlockedForUI = PX_Character->IsGameplayInputBlockedForUI();
+                Velocity = bGameplayInputBlockedForUI ? FVector::ZeroVector : Pawn->GetVelocity();
+                bHasInput = !bGameplayInputBlockedForUI && PX_Character->HasMoveInput();
 
                 if ( bHasInput )
                 {
@@ -31,6 +32,11 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
                     LastForwardVelocity = LastDirection.X * LastSpeed;
                     LastRightVelocity = LastDirection.Y * LastSpeed;
+                }
+                else
+                {
+                    LastForwardVelocity = 0.0f;
+                    LastRightVelocity = 0.0f;
                 }
                 
                 if ( PX_Character->GetLayerAnimInstance() )
@@ -44,8 +50,11 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         
 
         // Get Aim Rotation & Actor Rotation
-        const FRotator AimRot = Pawn->IsLocallyControlled() ? Pawn->GetControlRotation() : Cast<APX_Character>(Pawn)->GetAimRotation();
-        //const FRotator AimRot = PX_Character ? PX_Character->GetAimRotation() : Pawn->GetControlRotation();
+        APX_Character* PXCharacterForAim = Cast<APX_Character>(Pawn);
+        const bool bUseRemoteAimRotation = PXCharacterForAim && PXCharacterForAim->FindComponentByClass<UPX_DemoBotComponent>();
+        const FRotator AimRot = !PXCharacterForAim
+            ? Pawn->GetControlRotation()
+            : (bUseRemoteAimRotation ? PXCharacterForAim->GetAimRotation() : (Pawn->IsLocallyControlled() ? Pawn->GetControlRotation() : PXCharacterForAim->GetAimRotation()));
         const FRotator RefRot = Pawn->GetActorRotation();
 
         // Calculate Delta of Aim Rotation & Actor Rotation
@@ -56,11 +65,31 @@ void UPX_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         AimYaw = FMath::Clamp(Delta.Yaw + AimOffset, -180.f, 180.f);
         AimPitch = FMath::Clamp(Delta.Pitch, -90.f, 90.f);
 
+        if ( PXCharacterForAim && PXCharacterForAim->ShouldForceDemoAimOffset() )
+        {
+            AimYaw = PXCharacterForAim->GetForcedDemoAimYaw();
+            AimPitch = PXCharacterForAim->GetForcedDemoAimPitch();
+        }
+
         if ( APX_Character* PX_Character = Cast<APX_Character>(TryGetPawnOwner()) )
         {
+            UPX_DemoBotComponent* DemoBotComponent = PX_Character->FindComponentByClass<UPX_DemoBotComponent>();
+            if ( DemoBotComponent && DemoBotComponent->ShouldForceAimingPose() )
+            {
+                DemoBotComponent->EnsureCombatAnimLayer();
+            }
+
             if ( PX_Character->GetLayerAnimInstance() )
             {
                 PX_Character->GetLayerAnimInstance()->SetRotation(AimYaw, AimPitch);
+
+                if ( DemoBotComponent && DemoBotComponent->ShouldForceAimingPose() )
+                {
+                    bIsAiming = true;
+                    AimProgress = 1.0f;
+                    PX_Character->GetLayerAnimInstance()->SetIsAiming(true);
+                    PX_Character->GetLayerAnimInstance()->SetAimProgress(1.0f);
+                }
             }
         }
 
@@ -86,6 +115,15 @@ void UPX_CharacterAnimInstance::SetIsJumping(bool Value)
     }
 }
 
+void UPX_CharacterAnimInstance::SetIsFalling(bool Value)
+{
+    bIsFalling = Value;
+    if ( APX_Character* PX_Character = Cast<APX_Character>(TryGetPawnOwner()) )
+    {
+        PX_Character->GetLayerAnimInstance()->SetIsFalling(bIsFalling);
+    }
+}
+
 void UPX_CharacterAnimInstance::SetIsCrouching(bool Value)
 {
     bIsCrouching = Value;
@@ -95,10 +133,22 @@ void UPX_CharacterAnimInstance::SetIsCrouching(bool Value)
     }
 }
 
+void UPX_CharacterAnimInstance::SetHasEquippedWeapon(bool Value)
+{
+    bHasEquippedWeapon = Value;
+    if ( APX_Character* PX_Character = Cast<APX_Character>(TryGetPawnOwner()) )
+    {
+        if ( PX_Character->GetLayerAnimInstance() )
+        {
+            PX_Character->GetLayerAnimInstance()->SetHasEquippedWeapon(bHasEquippedWeapon);
+        }
+    }
+}
+
 void UPX_CharacterAnimInstance::SetIsAiming(bool Value)
 {
     
-    //UE_LOG(LogTemp, Log, TEXT("PX_CharacterAnimInstance::SetIsAiming %s -> %s"), bIsAiming ? TEXT("true") : TEXT("false"), Value ? TEXT("true") : TEXT("false"));
+    PX_LOG(Log, TEXT("PX_CharacterAnimInstance::SetIsAiming %s -> %s"), bIsAiming ? TEXT("true") : TEXT("false"), Value ? TEXT("true") : TEXT("false"));
     bIsAiming = Value;
     if ( APX_Character* PX_Character = Cast<APX_Character>(TryGetPawnOwner()) )
     {

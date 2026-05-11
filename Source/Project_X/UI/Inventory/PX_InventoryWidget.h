@@ -3,10 +3,15 @@
 #pragma once
 
 #include "Project_X.h"
+#include "GameplayTagContainer.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 #include "Blueprint/UserWidget.h"
+#include "TimerManager.h"
 #include "PX_InventoryWidget.generated.h"
 
+/* TargetTag로 대체
 enum class EPXInventorySlotTarget : uint8;
+*/
 struct FPXInventorySlot;
 class UPX_InventoryItemSlotsWidget;
 class UPX_InventoryWeaponSlotsWidget;
@@ -39,10 +44,16 @@ protected:
 private:
     // 인벤토리 초기화
     void InitInventory();
+    void RequestDeferredRefresh();
+    void HandleDeferredRefresh();
+    bool HasPendingInventoryReplication() const;
 
     // --- Inventory Component Function Handlers -----------------------------------------------------
     void HandleInventoryReady();
+	/* TargetTag로 대체
     void HandleSlotUpdated(EPXInventorySlotTarget Target, int32 SlotIndex, const FPXInventorySlot& InventorySlot);
+    */
+    void HandleSlotUpdated(FGameplayTag Target, int32 SlotIndex, const FPXInventorySlot& InventorySlot);
     //void HandleSlotsReset(EPXInventorySlotTarget Target);
 
     // --- Child Widget Variables -----------------------------------------------------
@@ -57,6 +68,9 @@ private:
     // 중복 바인딩 방지용
     UPROPERTY(Transient)
     bool bInventoryBounded = false;
+
+    FTimerHandle DeferredRefreshTimerHandle;
+    int32 DeferredRefreshAttemptCount = 0;
     
 
 };

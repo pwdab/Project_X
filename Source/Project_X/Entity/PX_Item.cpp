@@ -2,6 +2,7 @@
 
 
 #include "Entity/PX_Item.h"
+#include "AbilitySystem/Tags/PX_GameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/ActorChannel.h"
 #include "Components/SphereComponent.h"
@@ -118,15 +119,15 @@ void APX_Item::NormalizeDropDataIfNeeded()
     }
 
 
-    if ( ItemData.ItemDataAsset->Kind != EPXItemKind::Weapon ) return;
+    if ( ItemData.ItemDataAsset->IsWeaponItem() ) return;
 
-    const UPX_WeaponDataAsset* WeaponDataAsset = ItemData.ItemDataAsset->WeaponData;
+    const UPX_WeaponDataAsset* WeaponDataAsset = Cast<UPX_WeaponDataAsset>(ItemData.ItemDataAsset);
 
     if ( !WeaponDataAsset ) return;
 
-    if ( ItemData.AttackMode == EPXWeaponAttackMode::None )
+    if ( !ItemData.AttackModeTag.IsValid() )
     {
-        ItemData.AttackMode = WeaponDataAsset->DefaultAttackMode;
+        ItemData.AttackModeTag = WeaponDataAsset->DefaultAttackModeTag;
     }
 }
 

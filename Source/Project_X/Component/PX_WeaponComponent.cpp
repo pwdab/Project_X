@@ -213,10 +213,10 @@ void UPX_WeaponComponent::Attack()
 	const FVector TargetPoint = bHit ? HitResult.ImpactPoint : CameraLoc + CameraDir * TraceRange;
 
 	// Client Camera Line Trace (Cyan)
-	DrawDebugLine(GetWorld(), CameraLoc, TargetPoint, FColor::Cyan, false, Duration, 0, Thickness);
+	//DrawDebugLine(GetWorld(), CameraLoc, TargetPoint, FColor::Cyan, false, Duration, 0, Thickness);
 
 	// Client Camera Target Point (Cyan)
-	DrawDebugSphere(GetWorld(), TargetPoint, Radius, 16, FColor::Cyan, false, Duration);
+	//DrawDebugSphere(GetWorld(), TargetPoint, Radius, 16, FColor::Cyan, false, Duration);
 
 	// Server Attack
 	ServerAttack(MuzzleLoc, CameraLoc, TargetPoint);
@@ -297,11 +297,11 @@ void UPX_WeaponComponent::ServerAttack_Implementation(const FVector_NetQuantize 
 	const float Thickness = 0.f;
 
 	// 투사체 스폰 지점 (노란 구)
-	DrawDebugSphere(GetWorld(), MuzzleLoc, Radius, 16, FColor::Yellow, false, Duration);
+	//DrawDebugSphere(GetWorld(), MuzzleLoc, Radius, 16, FColor::Yellow, false, Duration);
 
 	// 투사체 궤적 (노란 선)
-	DrawDebugLine(GetWorld(), MuzzleLoc, ClientTargetPoint, FColor::Yellow, false, Duration, 0, Thickness);
+	//DrawDebugLine(GetWorld(), MuzzleLoc, ClientTargetPoint, FColor::Yellow, false, Duration, 0, Thickness);
 
 	// Server Target Point (Yellow)
-	DrawDebugSphere(GetWorld(), FinalTargetPoint, Radius, 16, FColor::Yellow, false, Duration);
+	//DrawDebugSphere(GetWorld(), FinalTargetPoint, Radius, 16, FColor::Yellow, false, Duration);
 }

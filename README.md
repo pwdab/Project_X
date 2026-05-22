@@ -179,3 +179,10 @@ Source/
 ```
 
 </details>
+
+<br>
+
+## 추가 정보
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Notion-logo.svg/120px-Notion-logo.svg.png?_=20220918151013" width="15" align="absmiddle"/> [Notion](https://www.notion.so/Project_X-334cd0a0642480b8a2e5e566e1f34144)에서 확인 가능합니다.
+
